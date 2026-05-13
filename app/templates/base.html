@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Rabbit Hole{% endblock %}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f9f9f7; color: #1a1a1a; max-width: 720px; margin: 0 auto; padding: 1.5rem; }
+    h1 { font-size: 1.6rem; margin-bottom: 1.25rem; }
+    a { color: #2563eb; }
+    .wiki-body { font-size: 1rem; line-height: 1.75; color: #202122; }
+    .wiki-body p { margin: .75rem 0; }
+    .wiki-body h2 { font-size: 1.3rem; border-bottom: 1px solid #eee; margin: 1.75rem 0 .6rem; padding-bottom: .3rem; }
+    .wiki-body h3 { font-size: 1.1rem; margin: 1.25rem 0 .4rem; }
+    .wiki-body h4 { font-size: 1rem; margin: 1rem 0 .3rem; }
+    .wiki-body figure { margin: 1.25rem 0; text-align: center; }
+    .wiki-body img { max-width: 100%; height: auto; border-radius: 4px; }
+    .wiki-body figcaption { font-size: .8rem; color: #666; margin-top: .3rem; }
+    .wiki-body table { max-width: 100%; overflow-x: auto; display: block; border-collapse: collapse; margin: 1rem 0; font-size: .9rem; }
+    .wiki-body td, .wiki-body th { border: 1px solid #ddd; padding: .4rem .6rem; vertical-align: top; }
+    .wiki-body th { background: #f3f4f6; font-weight: 600; }
+    .wiki-body ul, .wiki-body ol { padding-left: 1.5rem; margin: .5rem 0; }
+    .wiki-body li { margin: .25rem 0; }
+    .wiki-body .hatnote, .wiki-body .navbox, .wiki-body .reflist,
+    .wiki-body .mw-references-wrap { display: none; }
+    /* Parse API output sits directly in .wiki-body — scope mw-parser-output */
+    .wiki-body .mw-parser-output { font-size: 1rem; line-height: 1.75; }
+    .wiki-body .mw-parser-output img { max-width: 100%; height: auto; }
+    .wiki-body .mw-parser-output table { max-width: 100%; overflow-x: auto; display: block; }
+  </style>
+</head>
+<body>
+  {% block content %}{% endblock %}
+  <script src="/static/main.js" defer></script>
+</body>
+</html>

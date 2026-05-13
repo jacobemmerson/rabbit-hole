@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rabbit Hole</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f9f9f7;
+      color: #111;
+      min-height: 100vh;
+      padding: 2rem 3rem 4rem;
+    }
+
+    /* ── Top bar ── */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+    }
+
+    .wordmark {
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: #9ca3af;
+      text-decoration: none;
+    }
+
+    #refresh-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .3rem;
+      padding: .35rem .85rem;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 100px;
+      background: #fff;
+      font-size: .8rem;
+      color: #6b7280;
+      cursor: pointer;
+      transition: border-color .12s, color .12s;
+      font-family: inherit;
+    }
+
+    #refresh-btn:hover { border-color: #93c5fd; color: #2563eb; }
+    #refresh-btn:disabled { opacity: .5; cursor: default; }
+
+    /* ── Two-column layout ── */
+    .layout {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 3.5rem;
+      align-items: start;
+    }
+
+    /* ── Main feed column ── */
+    .feed-col {}
+
+    .section-heading {
+      display: flex;
+      align-items: baseline;
+      gap: .6rem;
+      margin-bottom: 1rem;
+    }
+
+    .section-heading h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+
+    .new-day-badge {
+      font-size: .7rem;
+      font-weight: 600;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 100px;
+      padding: .15rem .55rem;
+    }
+
+    /* ── Tab navigation ── */
+    .tab-nav {
+      display: flex;
+      gap: .5rem;
+      margin-bottom: 1.25rem;
+      border-bottom: 1.5px solid #e5e7eb;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      border-bottom: 2.5px solid transparent;
+      margin-bottom: -1.5px;   /* sit the active underline on top of the nav border */
+      font-size: 1rem;
+      font-weight: 600;
+      color: #9ca3af;
+      cursor: pointer;
+      padding: .45rem 1rem;
+      font-family: inherit;
+      transition: color .2s, border-color .2s;
+    }
+
+    .tab-btn:hover { color: #374151; }
+    .tab-btn.active { color: #111; border-bottom-color: #2563eb; }
+
+    /* ── Panel scroll container ── */
+    .panel-container {
+      overflow-x: auto;
+      display: flex;
+      scroll-snap-type: x mandatory;
+      scroll-behavior: smooth;
+      scrollbar-width: none;
+    }
+    .panel-container::-webkit-scrollbar { display: none; }
+
+    .panel {
+      width: 100%;
+      min-width: 100%;
+      flex-shrink: 0;
+    }
+
+    /* ── Article grids ── */
+    .article-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-auto-rows: 8rem;   /* every card the same height regardless of text length */
+      gap: .6rem;
+    }
+
+    .grid-message {
+      grid-column: 1 / -1;
+      font-size: .875rem;
+      color: #9ca3af;
+      padding: .5rem 0;
+    }
+
+    .article-card {
+      display: block;
+      background: #fff;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      text-decoration: none;
+      color: inherit;
+      overflow: hidden;        /* clip content at the fixed row height */
+      transition: border-color .12s, box-shadow .12s;
+    }
+
+    .article-card:hover {
+      border-color: #93c5fd;
+      box-shadow: 0 2px 8px rgba(37,99,235,.08);
+    }
+
+    .article-card h2 {
+      font-size: .95rem;
+      font-weight: 600;
+      color: #111;
+      margin-bottom: .3rem;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .article-card p {
+      font-size: .85rem;
+      color: #6b7280;
+      line-height: 1.55;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* ── History sidebar ── */
+    .sidebar {
+      position: sticky;
+      top: 2rem;
+      max-height: calc(100vh - 4rem);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-label {
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #c4c4c4;
+      margin-bottom: .75rem;
+      flex-shrink: 0;
+    }
+
+    .sidebar-scroll {
+      overflow-y: auto;
+      flex: 1;
+      scrollbar-width: thin;
+      scrollbar-color: #e5e7eb transparent;
+    }
+
+    .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+    .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 2px; }
+
+    /* Each history group */
+    .sidebar-group {
+      margin-bottom: .25rem;
+    }
+
+    /* Primary article row */
+    .sidebar-primary {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .45rem .6rem;
+      border-radius: 8px;
+      text-decoration: none;
+      color: #374151;
+      font-size: .82rem;
+      font-weight: 500;
+      transition: background .1s;
+      line-height: 1.3;
+    }
+
+    .sidebar-primary:hover { background: #fff; color: #2563eb; }
+
+    .sidebar-primary .rating { font-size: .75rem; flex-shrink: 0; opacity: .7; }
+
+    /* Children — hidden by default, expand on hover.
+       grid-template-rows animates to actual content height (smoother than max-height). */
+    .sidebar-children {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows .25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .sidebar-children-inner { overflow: hidden; }
+
+    .sidebar-group:hover .sidebar-children {
+      grid-template-rows: 1fr;
+    }
+
+    .sidebar-child {
+      display: flex;
+      align-items: center;
+      gap: .35rem;
+      padding: .3rem .6rem .3rem 1.4rem;
+      border-radius: 6px;
+      text-decoration: none;
+      color: #9ca3af;
+      font-size: .78rem;
+      transition: background .1s, color .1s;
+      line-height: 1.3;
+    }
+
+    .sidebar-child:hover { background: #fff; color: #2563eb; }
+
+    .sidebar-child .indent { color: #d1d5db; flex-shrink: 0; font-size: .7rem; }
+    .sidebar-child .child-title {
+      flex: 1; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* Empty state */
+    .sidebar-empty {
+      font-size: .8rem;
+      color: #d1d5db;
+      padding: .4rem .6rem;
+    }
+
+    /* ── Narrow screens: collapse to single column, sidebar below feed ── */
+    @media (max-width: 768px) {
+      body { padding: 1.5rem 1.25rem 3rem; }
+
+      .layout { grid-template-columns: 1fr; }
+
+      .article-grid { grid-template-columns: 1fr; }
+
+      .sidebar {
+        position: static;
+        max-height: none;
+        border-top: 1px solid #e5e7eb;
+        padding-top: 1.5rem;
+        margin-top: 1rem;
+      }
+
+      .sidebar-scroll { max-height: 300px; }
+
+      .sidebar-children { grid-template-rows: 0fr; }
+      .sidebar-group:hover .sidebar-children { grid-template-rows: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="/" class="wordmark">Rabbit Hole 🕳️</a>
+</div>
+
+<div class="layout">
+
+  <!-- History sidebar (left) -->
+  <aside class="sidebar">
+    <div class="sidebar-label">Reading history</div>
+    <div class="sidebar-scroll">
+      {% if history_groups %}
+        {% for group in history_groups %}
+        <div class="sidebar-group">
+          <a href="/article/{{ group.entry.title }}" class="sidebar-primary">
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+              {{ group.entry.title }}
+            </span>
+            <span class="rating">
+              {% if group.entry.rating and group.entry.rating >= 4 %}👍
+              {% elif group.entry.rating and group.entry.rating <= 2 %}👎
+              {% endif %}
+            </span>
+          </a>
+          {% if group.children %}
+          <div class="sidebar-children">
+            <div class="sidebar-children-inner">
+              {% for child in group.children %}
+              <a href="/article/{{ child.title }}" class="sidebar-child">
+                <span class="indent">↳</span>
+                <span class="child-title">{{ child.title }}</span>
+                <span class="rating" style="font-size:.75rem;opacity:.7;flex-shrink:0;">
+                  {% if child.rating and child.rating >= 4 %}👍
+                  {% elif child.rating and child.rating <= 2 %}👎
+                  {% endif %}
+                </span>
+              </a>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="sidebar-empty">Articles you read will appear here.</p>
+      {% endif %}
+    </div>
+  </aside>
+
+  <!-- Feed column (right) -->
+  <div class="feed-col">
+
+    <!-- Tab navigation — "New" badge sits in the tab bar so panel heights stay equal -->
+    <div class="tab-nav">
+      <button class="tab-btn active" id="tab-btn-for-you">For You</button>
+      <button class="tab-btn" id="tab-btn-top-daily">Top Daily</button>
+      {% if is_new_day %}<span class="new-day-badge" style="align-self:center;margin-left:.5rem;">New</span>{% endif %}
+    </div>
+
+    <div class="panel-container" id="panel-container">
+
+      <!-- For You panel -->
+      <div class="panel" id="panel-for-you" style="scroll-snap-align:start;">
+        <div id="feed" class="article-grid">
+          {% for article in articles %}
+          <a href="/article/{{ article.title }}" class="article-card">
+            <h2>{{ article.title }}</h2>
+            <p>{{ article.extract[:200] }}{% if article.extract|length > 200 %}…{% endif %}</p>
+          </a>
+          {% endfor %}
+        </div>
+        <div style="display:flex;justify-content:center;margin-top:1rem;">
+          <button id="refresh-btn">↺ Refresh</button>
+        </div>
+      </div>
+
+      <!-- Top Daily panel (lazy-loaded on first visit) -->
+      <div class="panel" id="panel-top-daily" style="scroll-snap-align:start;">
+        <div id="feed-top-daily" class="article-grid">
+          <p class="grid-message">Loading…</p>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<script src="/static/main.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rabbit Hole — Pick your interests</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f9f9f7;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 600px;
+    }
+
+    .wordmark {
+      font-size: .8rem;
+      font-weight: 700;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: #9ca3af;
+      margin-bottom: 2rem;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #111;
+      line-height: 1.2;
+      margin-bottom: .5rem;
+    }
+
+    .subtitle {
+      font-size: .95rem;
+      color: #6b7280;
+      margin-bottom: 2rem;
+    }
+
+    /* Hidden checkboxes with pill labels */
+    .pill-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+      margin-bottom: 2rem;
+    }
+
+    .pill input[type="checkbox"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .pill label {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      padding: .45rem .9rem;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 100px;
+      background: #fff;
+      font-size: .875rem;
+      color: #374151;
+      cursor: pointer;
+      user-select: none;
+      transition: background .12s, border-color .12s, color .12s;
+      white-space: nowrap;
+    }
+
+    .pill label:hover {
+      border-color: #93c5fd;
+      background: #eff6ff;
+    }
+
+    .pill input:checked + label {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: #fff;
+    }
+
+    .pill .emoji {
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    /* Footer row: counter + button */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    #counter {
+      font-size: .875rem;
+      color: #9ca3af;
+    }
+
+    #counter.has-selection { color: #2563eb; }
+
+    #submit-btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: .65rem 1.5rem;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .12s, opacity .12s;
+    }
+
+    #submit-btn:disabled {
+      opacity: .45;
+      cursor: default;
+    }
+
+    #submit-btn:not(:disabled):hover { background: #1d4ed8; }
+
+    #validation-msg {
+      font-size: .8rem;
+      color: #dc2626;
+      margin-top: .5rem;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="wordmark">Rabbit Hole 🕳️</div>
+  <h1>What are you curious about?</h1>
+  <p class="subtitle">Pick topics you enjoy — we'll find Wikipedia articles worth reading.</p>
+
+  {% set emojis = {
+    "Science": "🔬", "Mathematics": "🔢", "History": "📜",
+    "Technology": "⚙️", "Computing": "💻", "Arts": "🎨",
+    "Culture": "🏛️", "Geography": "🌍", "Philosophy": "💭",
+    "Religion": "🕌", "Sports": "⚽", "Nature": "🌿",
+    "Environment": "🌱", "Politics": "🗳️", "Society": "👥",
+    "Literature": "📚", "Music": "🎵", "Film": "🎬",
+    "Television": "📺", "Food": "🍴", "Economics": "📊",
+    "Business": "💼", "Health": "🏥", "Medicine": "💊",
+    "Space": "🚀", "Astronomy": "🔭"
+  } %}
+
+  <form id="onboard-form" action="/api/onboard" method="post">
+    <input type="hidden" name="timezone" id="timezone-input" value="UTC">
+
+    <div class="pill-grid">
+      {% for category in categories %}
+      <div class="pill">
+        <input type="checkbox" id="cat-{{ loop.index }}"
+               name="selected_categories" value="{{ category }}">
+        <label for="cat-{{ loop.index }}">
+          <span class="emoji">{{ emojis.get(category, "📌") }}</span>
+          {{ category }}
+        </label>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="footer">
+      <div>
+        <div id="counter">0 selected</div>
+        <div id="validation-msg">Please select at least one topic.</div>
+      </div>
+      <button type="submit" id="submit-btn" disabled>Start reading →</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  // Timezone
+  document.getElementById('timezone-input').value =
+    Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+  // Live counter + button state
+  const form = document.getElementById('onboard-form');
+  const counter = document.getElementById('counter');
+  const btn = document.getElementById('submit-btn');
+  const msg = document.getElementById('validation-msg');
+
+  function update() {
+    const n = form.querySelectorAll('input[name="selected_categories"]:checked').length;
+    counter.textContent = n === 0 ? '0 selected' : `${n} selected`;
+    counter.classList.toggle('has-selection', n > 0);
+    btn.disabled = n === 0;
+    if (n > 0) msg.style.display = 'none';
+  }
+
+  form.querySelectorAll('input[name="selected_categories"]').forEach(cb => {
+    cb.addEventListener('change', update);
+  });
+
+  form.addEventListener('submit', e => {
+    const n = form.querySelectorAll('input[name="selected_categories"]:checked').length;
+    if (n === 0) {
+      e.preventDefault();
+      msg.style.display = 'block';
+    }
+  });
+</script>
+</body>
+</html>

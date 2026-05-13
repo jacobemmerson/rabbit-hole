@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if article %}{{ article.title }} — {% endif %}Rabbit Hole</title>
+
+  <!-- CSS extracted directly from the proxied Wikipedia page -->
+  {{ wiki_css | safe }}
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; padding: 0; background: #fff; }
+
+    /* ── Sticky top bar ── */
+    #article-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #f8f9fa;
+      border-bottom: 1px solid #a2a9b1;
+      padding: .5rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      flex-wrap: wrap;
+    }
+    #article-header .back-link {
+      color: #3366cc;
+      text-decoration: none;
+      font-size: .875rem;
+      font-family: system-ui, sans-serif;
+      flex-shrink: 0;
+    }
+    #article-header .back-link:hover { text-decoration: underline; }
+    #article-header .article-title {
+      font-size: .875rem;
+      color: #54595d;
+      font-family: system-ui, sans-serif;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      min-width: 0;
+    }
+    #stars {
+      display: flex;
+      gap: .25rem;
+      font-size: 1.4rem;
+      cursor: pointer;
+      user-select: none;
+      flex-shrink: 0;
+    }
+    #article-header .wp-link {
+      color: #3366cc;
+      text-decoration: none;
+      font-size: .8rem;
+      font-family: system-ui, sans-serif;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    #article-header .wp-link:hover { text-decoration: underline; }
+
+    /* ── Article content ── */
+    #article-content {
+      max-width: 960px;
+      margin: 1.5rem auto;
+      padding: 0 1.5rem 3rem;
+    }
+
+    /* Ensure images stay within bounds and protocol-relative sources resolve */
+    .mw-parser-output img { max-width: 100%; height: auto; }
+    .mw-parser-output a[href^="/article/"] { color: #3366cc; }
+
+    /* Hide chrome we don't need */
+    .mw-parser-output .navbox,
+    .mw-parser-output .navbox-styles,
+    .mw-parser-output .mw-empty-elt { display: none; }
+  </style>
+</head>
+<body>
+
+<div id="article-header">
+  <a href="/" class="back-link">← Back to feed</a>
+  {% if article %}
+  <span class="article-title">{{ article.title }}</span>
+  {% endif %}
+  <div id="thumbs-widget" data-saved="{{ current_rating or '' }}"
+       style="display:flex;gap:.5rem;margin-left:auto;">
+    {% for emoji, val in [('👍', 5), ('👎', 1)] %}
+    <span class="thumb" data-rating="{{ val }}"
+          style="cursor:pointer;font-size:1.3rem;opacity:{% if current_rating == val %}1{% else %}0.35{% endif %};">{{ emoji }}</span>
+    {% endfor %}
+  </div>
+  {% if article and article.page_url %}
+  <a href="{{ article.page_url }}" target="_blank" rel="noopener" class="wp-link">Wikipedia ↗</a>
+  {% endif %}
+</div>
+
+<div id="article-content">
+  {% if wiki_html %}
+    {{ wiki_html | safe }}
+  {% elif article %}
+    <h1>{{ article.title }}</h1>
+    {% if article.thumbnail_url %}
+    <img src="{{ article.thumbnail_url }}" alt="{{ article.title }}"
+         style="max-width:100%;margin-bottom:1rem;border-radius:4px;display:block;">
+    {% endif %}
+    <p style="line-height:1.75;color:#333;">{{ article.extract }}</p>
+  {% endif %}
+</div>
+
+<div id="article-meta"
+     data-title="{% if article %}{{ article.title }}{% endif %}"
+     style="display:none;"></div>
+
+<script src="/static/main.js" defer></script>
+</body>
+</html>
