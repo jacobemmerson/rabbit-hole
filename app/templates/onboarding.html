@@ -132,6 +132,168 @@
       margin-top: .5rem;
       display: none;
     }
+
+    /* Custom interests pill button */
+    .pill-custom {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      padding: .45rem .9rem;
+      border: 1.5px dashed #d1d5db;
+      border-radius: 100px;
+      background: transparent;
+      font-size: .875rem;
+      color: #6b7280;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color .12s, color .12s, background .12s;
+      white-space: nowrap;
+    }
+    .pill-custom:hover { border-color: #93c5fd; color: #2563eb; background: #eff6ff; }
+    .pill-custom.has-interests { border-color: #2563eb; color: #2563eb; border-style: solid; }
+
+    /* Modal overlay */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 1.75rem;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+
+    .modal-header h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #111;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.25rem;
+      color: #9ca3af;
+      cursor: pointer;
+      line-height: 1;
+      padding: .1rem .3rem;
+    }
+    .modal-close:hover { color: #374151; }
+
+    .modal-desc {
+      font-size: .875rem;
+      color: #6b7280;
+      margin-bottom: 1.25rem;
+      line-height: 1.5;
+    }
+
+    .modal-input-row {
+      display: flex;
+      gap: .5rem;
+      margin-bottom: 1rem;
+    }
+
+    .modal-input-row input[type="text"] {
+      flex: 1;
+      padding: .5rem .75rem;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: .875rem;
+      font-family: inherit;
+      color: #111;
+      outline: none;
+      transition: border-color .12s;
+    }
+    .modal-input-row input[type="text"]:focus { border-color: #93c5fd; }
+
+    .modal-add-btn {
+      padding: .5rem .9rem;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: .875rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+      transition: background .12s;
+    }
+    .modal-add-btn:hover { background: #1d4ed8; }
+    .modal-add-btn:disabled { opacity: .45; cursor: default; }
+
+    .modal-input-hint {
+      font-size: .78rem;
+      color: #9ca3af;
+      margin-bottom: 1rem;
+    }
+    .modal-input-hint.error { color: #dc2626; }
+
+    .custom-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+      margin-bottom: 1.25rem;
+      min-height: 0;
+    }
+
+    .custom-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      padding: .3rem .65rem .3rem .75rem;
+      background: #eff6ff;
+      border: 1.5px solid #bfdbfe;
+      border-radius: 100px;
+      font-size: .82rem;
+      color: #1d4ed8;
+    }
+
+    .custom-chip button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #93c5fd;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0;
+      display: flex;
+      align-items: center;
+    }
+    .custom-chip button:hover { color: #2563eb; }
+
+    .modal-done-btn {
+      width: 100%;
+      padding: .6rem;
+      background: #f9fafb;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: .9rem;
+      font-weight: 600;
+      color: #374151;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background .12s, border-color .12s;
+    }
+    .modal-done-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
   </style>
 </head>
 <body>
@@ -166,6 +328,9 @@
         </label>
       </div>
       {% endfor %}
+      <button type="button" class="pill-custom" id="open-custom-btn">
+        <span class="emoji">✏️</span> Custom
+      </button>
     </div>
 
     <div class="footer">
@@ -178,19 +343,41 @@
   </form>
 </div>
 
+<div class="modal-overlay" id="custom-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 id="modal-title">Custom interests</h2>
+      <button type="button" class="modal-close" id="close-modal-btn" aria-label="Close">✕</button>
+    </div>
+    <p class="modal-desc">
+      Describe something you're curious about in your own words — a topic, question, or idea.
+      We'll embed it directly into your taste profile.
+    </p>
+    <div class="modal-input-row">
+      <input type="text" id="custom-text-input" placeholder="e.g. Byzantine architecture" maxlength="200">
+      <button type="button" class="modal-add-btn" id="add-custom-btn">Add</button>
+    </div>
+    <p class="modal-input-hint" id="custom-hint">Up to 5 interests, 200 characters each.</p>
+    <div class="custom-chips" id="custom-chips"></div>
+    <button type="button" class="modal-done-btn" id="done-custom-btn">Done</button>
+  </div>
+</div>
+
 <script>
   // Timezone
   document.getElementById('timezone-input').value =
     Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
-  // Live counter + button state
+  // Live counter + button state (categories + custom interests)
   const form = document.getElementById('onboard-form');
   const counter = document.getElementById('counter');
   const btn = document.getElementById('submit-btn');
   const msg = document.getElementById('validation-msg');
 
   function update() {
-    const n = form.querySelectorAll('input[name="selected_categories"]:checked').length;
+    const nCats = form.querySelectorAll('input[name="selected_categories"]:checked').length;
+    const nCustom = form.querySelectorAll('input[name="custom_interests"]').length;
+    const n = nCats + nCustom;
     counter.textContent = n === 0 ? '0 selected' : `${n} selected`;
     counter.classList.toggle('has-selection', n > 0);
     btn.disabled = n === 0;
@@ -202,12 +389,82 @@
   });
 
   form.addEventListener('submit', e => {
-    const n = form.querySelectorAll('input[name="selected_categories"]:checked').length;
-    if (n === 0) {
+    const nCats = form.querySelectorAll('input[name="selected_categories"]:checked').length;
+    const nCustom = form.querySelectorAll('input[name="custom_interests"]').length;
+    if (nCats + nCustom === 0) {
       e.preventDefault();
       msg.style.display = 'block';
     }
   });
+
+  // Custom interests modal
+  const modal = document.getElementById('custom-modal');
+  const openBtn = document.getElementById('open-custom-btn');
+  const closeBtn = document.getElementById('close-modal-btn');
+  const doneBtn = document.getElementById('done-custom-btn');
+  const customInput = document.getElementById('custom-text-input');
+  const addBtn = document.getElementById('add-custom-btn');
+  const chipsEl = document.getElementById('custom-chips');
+  const hintEl = document.getElementById('custom-hint');
+
+  function openModal() { modal.classList.add('open'); customInput.focus(); }
+  function closeModal() { modal.classList.remove('open'); customInput.value = ''; hintEl.className = 'modal-input-hint'; hintEl.textContent = 'Up to 5 interests, 200 characters each.'; }
+
+  openBtn.addEventListener('click', openModal);
+  closeBtn.addEventListener('click', closeModal);
+  doneBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.classList.contains('open')) closeModal(); });
+
+  function addInterest() {
+    const text = customInput.value.trim();
+    if (!text) return;
+    if (text.length > 200) {
+      hintEl.className = 'modal-input-hint error';
+      hintEl.textContent = 'Max 200 characters.';
+      return;
+    }
+    const existing = form.querySelectorAll('input[name="custom_interests"]');
+    if (existing.length >= 5) {
+      hintEl.className = 'modal-input-hint error';
+      hintEl.textContent = 'Maximum of 5 custom interests.';
+      return;
+    }
+
+    const key = Date.now().toString();
+
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.name = 'custom_interests';
+    hidden.value = text;
+    hidden.dataset.key = key;
+    form.appendChild(hidden);
+
+    const chip = document.createElement('div');
+    chip.className = 'custom-chip';
+    chip.dataset.key = key;
+    chip.innerHTML = `<span>${text}</span><button type="button" aria-label="Remove">✕</button>`;
+    chip.querySelector('button').addEventListener('click', () => removeInterest(key));
+    chipsEl.appendChild(chip);
+
+    customInput.value = '';
+    hintEl.className = 'modal-input-hint';
+    hintEl.textContent = 'Up to 5 interests, 200 characters each.';
+    openBtn.classList.add('has-interests');
+    update();
+  }
+
+  function removeInterest(key) {
+    form.querySelector(`input[data-key="${key}"]`)?.remove();
+    chipsEl.querySelector(`[data-key="${key}"]`)?.remove();
+    if (!form.querySelectorAll('input[name="custom_interests"]').length) {
+      openBtn.classList.remove('has-interests');
+    }
+    update();
+  }
+
+  addBtn.addEventListener('click', addInterest);
+  customInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addInterest(); } });
 </script>
 </body>
 </html>

@@ -12,7 +12,6 @@ MOCK_TITLES = [a.title for a in MOCK_ARTICLES]
 
 @pytest.fixture(autouse=True)
 def mock_feed_services(mocker):
-    mocker.patch("app.routes.pages.generate_feed", return_value=MOCK_TITLES)
     mocker.patch("app.routes.pages.fetch_summaries_bulk", return_value=MOCK_ARTICLES)
 
 
@@ -35,6 +34,17 @@ def test_home_no_categories_redirects(client):
     response = client.get("/", follow_redirects=False)
     assert response.status_code == 302
     assert response.headers["location"] == "/onboarding"
+
+
+def test_home_custom_interests_only_does_not_redirect(client):
+    profile = UserProfile(
+        timezone="UTC",
+        selected_categories=[],
+        custom_interests=["Byzantine architecture"],
+    )
+    client.cookies.set("session", dump_profile(profile))
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 200
 
 
 def test_home_no_cookie_redirects(client):

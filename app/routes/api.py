@@ -59,12 +59,14 @@ async def refresh(
 
 @router.post("/onboard")
 async def onboard(
-    selected_categories: list[str] = Form(...),
+    selected_categories: list[str] = Form(default=[]),
     timezone: str = Form(default="UTC"),
+    custom_interests: list[str] = Form(default=[]),
 ):
     profile = UserProfile(
         selected_categories=selected_categories,
         timezone=timezone,
+        custom_interests=[t.strip() for t in custom_interests if t.strip()][:5],
     )
     redirect = RedirectResponse(url="/", status_code=303)
     redirect.set_cookie(

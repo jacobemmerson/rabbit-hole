@@ -34,6 +34,12 @@ def compute_taste_vector(
         if extract:
             pairs.append((extract, profile.article_weight(entry.title)))
 
+    # Custom interests act as permanent preference anchors in the taste vector.
+    # Weight of 1.5 matches a positively-rated article with moderate scroll depth.
+    for text in profile.custom_interests:
+        if text.strip():
+            pairs.append((text.strip(), 1.5))
+
     if not pairs:
         return None
 

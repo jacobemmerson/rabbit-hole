@@ -8,7 +8,7 @@ from app.config import settings
 from app.dependencies import get_user_profile
 from app.models import ReadingHistoryEntry, UserProfile
 from app.services.cookie import dump_profile
-from app.services.recommendations import CATEGORY_SEED_POOL, generate_feed
+from app.services.recommendations import CATEGORY_SEED_POOL
 from app.services.reset import get_local_date, needs_reset
 from app.services.wikipedia import fetch_summaries_bulk, fetch_summary, fetch_wiki_page, inject_article_chrome
 
@@ -68,19 +68,14 @@ async def home(
     request: Request,
     profile: UserProfile = Depends(get_user_profile),
 ):
-    if not profile.selected_categories:
+    if not profile.selected_categories and not profile.custom_interests:
         return RedirectResponse(url="/onboarding", status_code=302)
 
     is_new_day = needs_reset(profile)
     if is_new_day:
-        # Archive the outgoing articles into shown_articles (sliding window cooldown)
-        new_shown = list(dict.fromkeys(profile.shown_articles + profile.current_articles))
-        profile.shown_articles = new_shown[-42:]
-        profile.current_articles = await generate_feed(profile)
+        # Advance last_generated so we don't re-trigger on every request before JS refresh completes.
+        # Archiving and feed generation happen in POST /api/refresh, called automatically by JS.
         profile.last_generated = get_local_date(profile.timezone).isoformat()
-        # Record newly generated articles as shown
-        new_shown = list(dict.fromkeys(profile.shown_articles + profile.current_articles))
-        profile.shown_articles = new_shown[-42:]
 
     articles = await fetch_summaries_bulk(profile.current_articles)
 

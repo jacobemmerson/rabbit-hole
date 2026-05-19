@@ -112,6 +112,60 @@ async def test_fetch_search_error(mock_client):
 
 
 @pytest.mark.asyncio
+async def test_fetch_summary_retries_on_429(mock_client, mocker):
+    mocker.patch("asyncio.sleep")
+    mock_client.get.side_effect = [
+        _mock_response(429),
+        _mock_response(200, SUMMARY_PAYLOAD),
+    ]
+    result = await wiki_service.fetch_summary("Quantum_mechanics")
+    assert isinstance(result, ArticleSummary)
+    assert mock_client.get.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_fetch_search_retries_on_429(mock_client, mocker):
+    mocker.patch("asyncio.sleep")
+    mock_client.get.side_effect = [
+        _mock_response(429),
+        _mock_response(200, SEARCH_PAYLOAD),
+    ]
+    result = await wiki_service.fetch_search("quantum mechanics")
+    assert "Wave function" in result
+    assert mock_client.get.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_fetch_summary_exhausts_retries_on_429(mock_client, mocker):
+    mocker.patch("asyncio.sleep")
+    mock_client.get.return_value = _mock_response(429)
+    result = await wiki_service.fetch_summary("Quantum_mechanics")
+    assert result is None
+    assert mock_client.get.call_count == 5
+
+
+@pytest.mark.asyncio
+async def test_fetch_summaries_bulk_excludes_empty_extract(mock_client):
+    # Both extract passes (exintro then exsentences fallback) return no text.
+    # The article must NOT appear in results — an empty card would be shown otherwise.
+    empty_batch = {
+        "query": {
+            "pages": {
+                "1": {
+                    "pageid": 1,
+                    "title": "Tom Kane",
+                    "extract": "",
+                    "fullurl": "https://en.wikipedia.org/wiki/Tom_Kane",
+                }
+            }
+        }
+    }
+    mock_client.get.return_value = _mock_response(200, empty_batch)
+    results = await wiki_service.fetch_summaries_bulk(["Tom Kane"])
+    assert results == []
+
+
+@pytest.mark.asyncio
 async def test_fetch_summaries_bulk_partial(mock_client):
     # fetch_summaries_bulk now uses a single batch action API call.
     # Missing articles appear with "missing" key in the pages dict.

@@ -57,10 +57,6 @@ def test_load_garbage():
 
 def test_cookie_written_on_home_request(client, signed_cookie_for, empty_profile, mocker):
     mocker.patch(
-        "app.routes.pages.generate_feed",
-        return_value=["A", "B", "C", "D", "E"],
-    )
-    mocker.patch(
         "app.routes.pages.fetch_summaries_bulk",
         return_value=[],
     )

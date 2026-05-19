@@ -30,10 +30,12 @@ async def lifespan(app: FastAPI):
     )
     wiki.init_semaphore()
     emb.load_model()
+    wiki.load_candidate_cache()        # warm search/category cache from disk before serving
     await wiki.fetch_top_articles()   # warm the popularity cache before serving traffic
     refresh_task = asyncio.create_task(_daily_popularity_refresh())
     yield
     refresh_task.cancel()
+    wiki.save_candidate_cache()        # persist search/category cache for next startup
     await wiki._client.aclose()
     wiki._rest_sem = None
     wiki._action_sem = None

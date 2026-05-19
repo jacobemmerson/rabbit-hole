@@ -86,8 +86,9 @@ if (onboardForm) {
   tzInput.value = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
   onboardForm.addEventListener('submit', (e) => {
-    const checked = onboardForm.querySelectorAll('input[name="selected_categories"]:checked');
-    if (checked.length < 1) {
+    const nCats = onboardForm.querySelectorAll('input[name="selected_categories"]:checked').length;
+    const nCustom = onboardForm.querySelectorAll('input[name="custom_interests"]').length;
+    if (nCats + nCustom < 1) {
       e.preventDefault();
       document.getElementById('validation-msg').style.display = 'block';
     }
@@ -97,7 +98,7 @@ if (onboardForm) {
 // Feed: refresh button calls POST /api/refresh and re-renders cards
 const refreshBtn = document.getElementById('refresh-btn');
 if (refreshBtn) {
-  refreshBtn.addEventListener('click', async () => {
+  async function doRefresh() {
     refreshBtn.disabled = true;
     refreshBtn.textContent = 'Loading…';
     try {
@@ -117,7 +118,14 @@ if (refreshBtn) {
       refreshBtn.disabled = false;
       refreshBtn.textContent = 'Refresh ↺';
     }
-  });
+  }
+
+  refreshBtn.addEventListener('click', doRefresh);
+
+  // On a daily reset the server serves stale articles immediately and sets this flag.
+  // Auto-trigger so the new feed swaps in without requiring a manual click.
+  const feed = document.getElementById('feed');
+  if (feed && feed.dataset.autoRefresh) doRefresh();
 }
 
 // Article page: show one-time rating hint on first visit

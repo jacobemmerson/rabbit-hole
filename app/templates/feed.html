@@ -362,7 +362,7 @@
 
       <!-- For You panel -->
       <div class="panel" id="panel-for-you" style="scroll-snap-align:start;">
-        <div id="feed" class="article-grid">
+        <div id="feed" class="article-grid"{% if is_new_day %} data-auto-refresh="true"{% endif %}>
           {% for article in articles %}
           <a href="/article/{{ article.title }}" class="article-card">
             <h2>{{ article.title }}</h2>

@@ -1,7 +1,9 @@
 import asyncio
+import json
 import logging
 import re
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import httpx
 
@@ -46,7 +48,7 @@ _WIKIMEDIA_PAGEVIEWS_URL = "https://wikimedia.org/api/rest_v1/metrics/pageviews/
 def init_semaphore() -> None:
     global _rest_sem, _action_sem
     _rest_sem = asyncio.Semaphore(2)    # allow 2 concurrent summary fetches
-    _action_sem = asyncio.Semaphore(1)  # serialize category/search calls
+    _action_sem = asyncio.Semaphore(2)  # allow 2 concurrent category/search calls
 
 
 async def _rest_get(url: str, **kwargs) -> httpx.Response:
@@ -67,7 +69,7 @@ async def _action_get(url: str, **kwargs) -> httpx.Response:
     """Rate-limited GET for the Wikipedia action API with retry on 429."""
     for attempt in range(5):
         async with _action_sem:
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.15)
             resp = await _client.get(url, **kwargs)
         if resp.status_code != 429:
             return resp
@@ -532,8 +534,41 @@ async def fetch_summaries_bulk(titles: list[str]) -> list[ArticleSummary]:
                         datetime.now() - _SUMMARY_TTL + timedelta(hours=1),
                     )
 
-            results.extend(batch_articles)
+            results.extend(a for a in batch_articles if a.extract)
         except (httpx.HTTPError, httpx.TimeoutException, Exception) as e:
             logger.warning("fetch_summaries_bulk batch failed: %s", e)
 
     return results
+
+
+_CACHE_FILE = Path(".cache/candidates.json")
+
+
+def save_candidate_cache() -> None:
+    try:
+        _CACHE_FILE.parent.mkdir(exist_ok=True)
+        data = {
+            k: {"titles": v[0], "cached_at": v[1].isoformat()}
+            for k, v in _candidate_cache.items()
+        }
+        _CACHE_FILE.write_text(json.dumps(data))
+        logger.info("Candidate cache saved: %d entries", len(data))
+    except Exception as e:
+        logger.warning("save_candidate_cache failed: %s", e)
+
+
+def load_candidate_cache() -> None:
+    if not _CACHE_FILE.exists():
+        return
+    try:
+        data = json.loads(_CACHE_FILE.read_text())
+        now = datetime.now()
+        loaded = 0
+        for k, v in data.items():
+            cached_at = datetime.fromisoformat(v["cached_at"])
+            if now - cached_at < _CANDIDATE_TTL:
+                _candidate_cache[k] = (v["titles"], cached_at)
+                loaded += 1
+        logger.info("Candidate cache loaded: %d entries from disk", loaded)
+    except Exception as e:
+        logger.warning("load_candidate_cache failed: %s", e)

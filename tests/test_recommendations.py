@@ -5,7 +5,7 @@ import pytest
 
 import app.services.embeddings as emb
 from app.models import ArticleSummary, ReadingHistoryEntry, UserProfile
-from app.services.recommendations import generate_feed
+from app.services.recommendations import generate_cold_start, generate_feed
 
 
 def _make_mock_model(seed: int = 42) -> MagicMock:
@@ -173,3 +173,31 @@ def test_alpha_below_1_before_10_articles():
     alpha = min(len(profile.reading_history) / 10, 1.0)
     assert alpha == 0.9
     assert alpha < 1.0
+
+
+@pytest.mark.asyncio
+async def test_cold_start_custom_interests_not_crowded_out(mocker):
+    # With 2 categories and 1 custom interest there are 3 groups in the round-robin.
+    # The custom interest must claim at least one slot even when category buckets
+    # are full — previously custom filled only after categories were exhausted.
+    cat_titles = [f"CatArticle{i}" for i in range(20)]
+    custom_titles = [f"CustomArticle{i}" for i in range(10)]
+
+    async def fake_search(query):
+        if query.startswith("custom:"):
+            return custom_titles
+        return cat_titles
+
+    mocker.patch("app.services.recommendations.fetch_search", side_effect=fake_search)
+    mocker.patch("app.services.recommendations.get_popularity", return_value={})
+
+    result = await generate_cold_start(
+        selected_categories=["Science", "History"],
+        seen_articles=[],
+        count=6,
+        custom_interests=["custom: deep sea biology"],
+    )
+
+    assert len(result) == 6
+    custom_in_result = [t for t in result if t.startswith("CustomArticle")]
+    assert len(custom_in_result) >= 1, "Custom interest got zero slots despite equal round-robin weight"

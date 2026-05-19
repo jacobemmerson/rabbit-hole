@@ -186,37 +186,53 @@ async def generate_cold_start(
     selected_categories: list[str],
     seen_articles: list[str],
     count: int = 6,
+    custom_interests: list[str] | None = None,
 ) -> list[str]:
     cat_query_pairs: list[tuple[str, str]] = [
         (cat, q)
         for cat in selected_categories
         for q in get_daily_seeds(cat)
     ]
+    custom_queries = [t.strip() for t in (custom_interests or []) if t.strip()]
 
-    if not cat_query_pairs:
+    if not cat_query_pairs and not custom_queries:
         return []
 
-    raw = await asyncio.gather(*[fetch_search(q) for _, q in cat_query_pairs])
-
     seen_set = set(seen_articles)
+
+    raw_cat = await asyncio.gather(*[fetch_search(q) for _, q in cat_query_pairs]) if cat_query_pairs else []
+    raw_custom = await asyncio.gather(*[fetch_search(q) for q in custom_queries]) if custom_queries else []
+
     buckets: dict[str, list[str]] = {cat: [] for cat in selected_categories}
     seen_in_bucket: dict[str, set[str]] = {cat: set() for cat in selected_categories}
+    custom_keys = [f"__custom__{i}" for i in range(len(custom_queries))]
+    custom_buckets: dict[str, list[str]] = {k: [] for k in custom_keys}
+    custom_seen: set[str] = set()
 
-    for (cat, _), batch in zip(cat_query_pairs, raw):
+    for (cat, _), batch in zip(cat_query_pairs, raw_cat):
         for title in batch:
             if _is_valid_article(title) and title not in seen_set and title not in seen_in_bucket[cat]:
                 buckets[cat].append(title)
                 seen_in_bucket[cat].add(title)
 
+    for i, batch in enumerate(raw_custom):
+        key = f"__custom__{i}"
+        for title in batch:
+            if _is_valid_article(title) and title not in seen_set and title not in custom_seen:
+                custom_buckets[key].append(title)
+                custom_seen.add(title)
+
     popularity = get_popularity()
     for cat in selected_categories:
         buckets[cat].sort(key=lambda t: popularity.get(t, 501))
+    for key in custom_keys:
+        custom_buckets[key].sort(key=lambda t: popularity.get(t, 501))
 
-    # Full round-robin across all categories until `count` is reached.
-    # This ensures every selected interest gets representation before any
-    # category takes a second slot — no global popularity fill that lets
-    # one dominant category crowd out others.
-    return _round_robin(buckets, selected_categories, set(), count)
+    # Joint round-robin: each category and each custom interest gets an equal slot
+    # in the rotation so neither dominates the other.
+    all_buckets = {**buckets, **custom_buckets}
+    all_group_keys = selected_categories + custom_keys
+    return _round_robin(all_buckets, all_group_keys, set(), count)
 
 
 async def _gather_candidates(
@@ -234,9 +250,11 @@ async def _gather_candidates(
         for q in get_daily_seeds(cat)
     ]
     history_titles = [e.title for e in profile.reading_history]
+    custom_queries = [t.strip() for t in profile.custom_interests if t.strip()]
 
     seed_results = await asyncio.gather(*[fetch_search(q) for _, q in cat_query_pairs])
     history_results = await asyncio.gather(*[fetch_search(t) for t in history_titles])
+    custom_results = await asyncio.gather(*[fetch_search(q) for q in custom_queries]) if custom_queries else []
 
     appearance_counts: dict[str, int] = {}
     seen_candidates: set[str] = set()
@@ -260,6 +278,17 @@ async def _gather_candidates(
                 seen_candidates.add(title)
                 appearance_counts[title] = appearance_counts.get(title, 0) + 1
 
+    # Custom interest searches: tag each with its own virtual key so generate_warm_user
+    # gives them equal round-robin slots alongside categories.
+    for i, batch in enumerate(custom_results):
+        custom_key = f"__custom__{i}"
+        for title in batch:
+            if _is_valid_article(title) and title not in seen and title not in seen_candidates:
+                ordered.append(title)
+                seen_candidates.add(title)
+                category_source[title] = custom_key
+                appearance_counts[title] = appearance_counts.get(title, 0) + 1
+
     return ordered[:MAX_CANDIDATES], appearance_counts, category_source
 
 
@@ -268,7 +297,8 @@ async def generate_warm_user(profile: UserProfile, seen: set[str]) -> list[str]:
 
     if not candidate_titles:
         return await generate_cold_start(
-            profile.selected_categories, list(seen), count=settings.feed_size
+            profile.selected_categories, list(seen),
+            count=settings.feed_size, custom_interests=profile.custom_interests,
         )
 
     history_titles = [e.title for e in profile.reading_history]
@@ -283,7 +313,8 @@ async def generate_warm_user(profile: UserProfile, seen: set[str]) -> list[str]:
     taste_vector = embeddings.compute_taste_vector(profile, history_summaries)
     if taste_vector is None:
         return await generate_cold_start(
-            profile.selected_categories, list(seen), count=settings.feed_size
+            profile.selected_categories, list(seen),
+            count=settings.feed_size, custom_interests=profile.custom_interests,
         )
 
     embed_scores = embeddings.score_candidates(taste_vector, candidate_summaries)
@@ -314,23 +345,23 @@ async def generate_warm_user(profile: UserProfile, seen: set[str]) -> list[str]:
         if title in summary_map
     ]
 
-    # Always apply category-aware round-robin for multi-category users.
-    # Convergence happens organically: if the user consistently ignores a
-    # category, its articles cycle into shown_articles cooldown and the
-    # bucket naturally empties — no arbitrary article-count threshold needed.
-    if len(profile.selected_categories) > 1:
-        cat_buckets: dict[str, list[str]] = {cat: [] for cat in profile.selected_categories}
+    # Round-robin across categories and custom interests so neither dominates.
+    # History-sourced candidates (no group tag) fill remaining slots as overflow.
+    custom_keys = [f"__custom__{i}" for i, t in enumerate(profile.custom_interests) if t.strip()]
+    all_group_keys = profile.selected_categories + custom_keys
+    if len(all_group_keys) > 1:
+        cat_buckets: dict[str, list[str]] = {k: [] for k in all_group_keys}
         overflow: list[tuple[str, float]] = []
         for title, score in sorted(scored, key=lambda x: x[1], reverse=True):
-            cat = category_source.get(title)
-            if cat in cat_buckets:
-                cat_buckets[cat].append(title)
+            group = category_source.get(title)
+            if group in cat_buckets:
+                cat_buckets[group].append(title)
             else:
                 overflow.append((title, score))
 
-        results = _round_robin(cat_buckets, profile.selected_categories, set(), settings.feed_size)
+        results = _round_robin(cat_buckets, all_group_keys, set(), settings.feed_size)
 
-        # Fill any remaining slots from history-sourced candidates (no category tag)
+        # Fill any remaining slots from history-sourced candidates (no group tag)
         picked = set(results)
         for title, _ in overflow:
             if len(results) >= settings.feed_size:
@@ -351,6 +382,7 @@ async def generate_feed(profile: UserProfile) -> list[str]:
     seen = set(profile.seen_articles) | set(profile.shown_articles) | set(profile.current_articles)
     if len(profile.reading_history) < 3:
         return await generate_cold_start(
-            profile.selected_categories, list(seen), count=settings.feed_size
+            profile.selected_categories, list(seen),
+            count=settings.feed_size, custom_interests=profile.custom_interests,
         )
     return await generate_warm_user(profile, seen)

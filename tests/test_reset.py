@@ -49,16 +49,14 @@ def test_no_reset_timezone_behind_server():
         assert needs_reset(profile) is False
 
 
-def test_reset_produces_distinct_articles(client, mocker):
+def test_reset_serves_stale_and_flags_auto_refresh(client, mocker):
+    # On a daily reset the home route now serves the previous day's articles immediately
+    # and signals JS to auto-call POST /api/refresh in the background.
     old_titles = ["Old_A", "Old_B", "Old_C", "Old_D", "Old_E"]
-    new_titles = ["New_F", "New_G", "New_H", "New_I", "New_J"]
 
     from app.models import ArticleSummary
-    new_articles = [
-        ArticleSummary(title=t, extract="x", page_url="") for t in new_titles
-    ]
-    mocker.patch("app.routes.pages.generate_feed", return_value=new_titles)
-    mocker.patch("app.routes.pages.fetch_summaries_bulk", return_value=new_articles)
+    old_articles = [ArticleSummary(title=t, extract="x", page_url="") for t in old_titles]
+    mocker.patch("app.routes.pages.fetch_summaries_bulk", return_value=old_articles)
 
     profile = UserProfile(
         timezone="UTC",
@@ -67,32 +65,26 @@ def test_reset_produces_distinct_articles(client, mocker):
         current_articles=old_titles,
         seen_articles=[],
     )
-    cookie_val = dump_profile(profile)
 
-    client.cookies.set("session", cookie_val)
+    client.cookies.set("session", dump_profile(profile))
     with patch("app.services.reset.datetime") as mock_dt:
         from datetime import datetime, timezone
         mock_dt.now.return_value = datetime(2026, 5, 11, 12, 0, 0, tzinfo=timezone.utc)
         response = client.get("/")
 
     assert response.status_code == 200
-    # Verify the new articles appear in the rendered page
-    for title in new_titles:
-        assert title in response.text
-    # Verify old articles are NOT in the rendered feed cards
+    # Stale articles are served immediately; JS will swap them via auto-refresh
     for title in old_titles:
-        assert title not in response.text
+        assert title in response.text
+    # Page signals JS to trigger auto-refresh
+    assert 'data-auto-refresh' in response.text
 
-    # Verify the updated cookie has old titles in seen_articles
+    # Cookie has last_generated bumped to today so reset doesn't re-fire
     from app.services.cookie import load_profile
     set_cookie = response.headers.get("set-cookie", "")
-    # Extract cookie value from Set-Cookie header
     cookie_part = [p for p in set_cookie.split(";") if "session=" in p]
     assert cookie_part, "No session cookie written"
-    raw = cookie_part[0].split("session=", 1)[1]
-    updated = load_profile(raw)
-    # Unclicked articles are NOT moved to seen_articles on reset
-    for title in old_titles:
-        assert title not in updated.seen_articles
-    for title in new_titles:
-        assert title in updated.current_articles
+    updated = load_profile(cookie_part[0].split("session=", 1)[1])
+    assert updated.last_generated == "2026-05-11"
+    # current_articles unchanged — POST /api/refresh handles generation and archiving
+    assert set(updated.current_articles) == set(old_titles)

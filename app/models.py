@@ -16,6 +16,7 @@ class UserProfile(BaseModel):
     seen_articles: list[str] = []
     reading_history: list[ReadingHistoryEntry] = []
     shown_articles: list[str] = []   # recently displayed; excluded temporarily from recommendations
+    custom_interests: list[str] = []  # free-text interests embedded directly into the taste vector
 
     def article_weight(self, title: str) -> float:
         rating_map = {1: 0.2, 2: 0.5, 3: 1.0, 4: 1.5, 5: 2.0}
