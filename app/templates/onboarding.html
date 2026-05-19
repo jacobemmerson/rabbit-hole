@@ -294,11 +294,86 @@
       transition: background .12s, border-color .12s;
     }
     .modal-done-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
+
+    /* ToS modal */
+    .tos-body { font-size: .875rem; color: #374151; line-height: 1.6; margin-bottom: 1.5rem; }
+    .tos-body p { margin-bottom: .9rem; }
+    .tos-body p:last-child { margin-bottom: 0; }
+    .tos-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: .6rem; margin-bottom: .9rem; }
+    .tos-list li { display: flex; gap: .6rem; }
+    .tos-list li::before { content: ''; flex-shrink: 0; }
+    .tos-list .tos-icon { flex-shrink: 0; font-size: 1rem; line-height: 1.6; }
+    .tos-clear-note { font-size: .8rem; color: #9ca3af; border-top: 1px solid #f3f4f6; padding-top: .9rem; }
+    .tos-actions { display: flex; gap: .75rem; justify-content: flex-end; }
+    .tos-actions button {
+      padding: .55rem 1.1rem;
+      border-radius: 8px;
+      font-size: .875rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      border: none;
+      transition: background .12s;
+    }
+    #tos-decline-btn { background: #f3f4f6; color: #374151; }
+    #tos-decline-btn:hover { background: #e5e7eb; }
+    #tos-accept-btn { background: #2563eb; color: #fff; }
+    #tos-accept-btn:hover { background: #1d4ed8; }
+
+    /* ── Wordmark rabbit animation ─────────────────────────────────── */
+    .rabbit-stage {
+      display: inline-block;
+      position: relative;
+      width: 28px; height: 28px;
+      vertical-align: middle;
+      margin-left: 3px;
+      overflow: visible;
+    }
+    .rabbit-mover {
+      position: absolute;
+      top: 0; left: 0;
+      animation: rabbit-move 6s linear infinite;
+    }
+    .rabbit-disp {
+      display: block;
+      width: 28px; height: 28px;
+      animation: rabbit-face 6s step-end infinite;
+    }
+    .rabbit-gif {
+      position: absolute;
+      top: 0; left: 0;
+      height: 28px; width: auto;
+    }
+    .rabbit-gif-idle { animation: rabbit-show-idle 6s step-end infinite; }
+    .rabbit-gif-hop  { opacity: 0; animation: rabbit-show-hop 6s step-end infinite; }
+
+    @keyframes rabbit-move {
+      0%   { transform: translateX(0);    animation-timing-function: step-end; }
+      25%  { transform: translateX(0);    animation-timing-function: ease-in-out; }
+      50%  { transform: translateX(30px); animation-timing-function: step-end; }
+      75%  { transform: translateX(30px); animation-timing-function: ease-in-out; }
+      100% { transform: translateX(0); }
+    }
+    @keyframes rabbit-face {
+      0%    { transform: scaleX(1); }
+      62.5% { transform: scaleX(-1); }
+      100%  { transform: scaleX(-1); }
+    }
+    @keyframes rabbit-show-idle {
+      0%, 50%  { opacity: 1; }
+      25%, 75% { opacity: 0; }
+      100%     { opacity: 1; }
+    }
+    @keyframes rabbit-show-hop {
+      0%, 50%  { opacity: 0; }
+      25%, 75% { opacity: 1; }
+      100%     { opacity: 0; }
+    }
   </style>
 </head>
 <body>
 <div class="container">
-  <div class="wordmark">Rabbit Hole 🕳️</div>
+  <div class="wordmark">Rabbit Hole<span class="rabbit-stage" aria-hidden="true"><span class="rabbit-mover"><span class="rabbit-disp"><img class="rabbit-gif rabbit-gif-idle" src="/media/idle.gif" alt=""><img class="rabbit-gif rabbit-gif-hop" src="/media/hopping.gif" alt=""></span></span></span></div>
   <h1>What are you curious about?</h1>
   <p class="subtitle">Pick topics you enjoy — we'll find Wikipedia articles worth reading.</p>
 
@@ -363,6 +438,36 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="tos-modal" role="dialog" aria-modal="true" aria-labelledby="tos-title">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 id="tos-title">Before you dive in</h2>
+      <button type="button" class="modal-close" id="tos-close-btn" aria-label="Close">✕</button>
+    </div>
+    <div class="tos-body">
+      <ul class="tos-list">
+        <li>
+          <span class="tos-icon">🔒</span>
+          <span><strong>Stored on this device only.</strong> Your topics, reading history, ratings, and preferences are kept in a signed browser cookie and your browser's local storage. Nothing is sent to any external service.</span>
+        </li>
+        <li>
+          <span class="tos-icon">📖</span>
+          <span><strong>Wikipedia content.</strong> Article searches and summaries are fetched directly from Wikipedia's servers by your browser, subject to <a href="https://www.wikimedia.org/wiki/Policy:Terms_of_Use" target="_blank" rel="noopener" style="color:#2563eb;">Wikipedia's terms of use</a>.</span>
+        </li>
+        <li>
+          <span class="tos-icon">🤖</span>
+          <span><strong>Recommendation scoring.</strong> Your reading history is sent to a server to rank article suggestions. No data is collected or stored server-side — it is used only to compute your recommendations and immediately discarded.</span>
+        </li>
+      </ul>
+      <p class="tos-clear-note">You can delete all your data at any time using the "Clear data" button in the feed.</p>
+    </div>
+    <div class="tos-actions">
+      <button type="button" id="tos-decline-btn">Decline</button>
+      <button type="button" id="tos-accept-btn">Accept &amp; continue</button>
+    </div>
+  </div>
+</div>
+
 <script>
   // Timezone
   document.getElementById('timezone-input').value =
@@ -388,12 +493,36 @@
     cb.addEventListener('change', update);
   });
 
+  // ToS gate — show the notice on first submit attempt, then let the form through.
+  const tosModal = document.getElementById('tos-modal');
+  let tosAccepted = false;
+
+  function closeTos() { tosModal.classList.remove('open'); }
+
+  document.getElementById('tos-close-btn').addEventListener('click', closeTos);
+  document.getElementById('tos-decline-btn').addEventListener('click', closeTos);
+  tosModal.addEventListener('click', e => { if (e.target === tosModal) closeTos(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && tosModal.classList.contains('open')) closeTos();
+  });
+
+  document.getElementById('tos-accept-btn').addEventListener('click', () => {
+    tosAccepted = true;
+    closeTos();
+    form.submit(); // bypasses the submit event so we don't re-show the modal
+  });
+
   form.addEventListener('submit', e => {
     const nCats = form.querySelectorAll('input[name="selected_categories"]:checked').length;
     const nCustom = form.querySelectorAll('input[name="custom_interests"]').length;
     if (nCats + nCustom === 0) {
       e.preventDefault();
       msg.style.display = 'block';
+      return;
+    }
+    if (!tosAccepted) {
+      e.preventDefault();
+      tosModal.classList.add('open');
     }
   });
 

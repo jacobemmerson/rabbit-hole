@@ -37,12 +37,10 @@ def test_article_page_shows_thumbs_rating(client, mocker, signed_cookie_for):
         reading_history=[
             ReadingHistoryEntry(title="Quantum_mechanics", rating=5, scroll_depth=80)
         ],
-        seen_articles=["Quantum_mechanics"],
     )
     client.cookies.set("session", signed_cookie_for(profile))
     response = client.get("/article/Quantum_mechanics")
     assert response.status_code == 200
-    # Thumbs up (rating=5) should be fully opaque, others dimmed
     assert 'data-rating="5"' in response.text
     assert 'opacity:1' in response.text
 
@@ -52,14 +50,6 @@ def test_article_page_writes_cookie(client, mocker):
     response = client.get("/article/Quantum_mechanics")
     assert response.status_code == 200
     assert "set-cookie" in response.headers
-
-
-def test_article_visit_marks_seen(client, mocker):
-    mocker.patch("app.routes.pages.fetch_summary", return_value=MOCK_ARTICLE)
-    response = client.get("/article/Quantum_mechanics")
-    updated = extract_profile(response)
-    # Canonical title from article.title ("Quantum_mechanics") is used, not the URL slug
-    assert "Quantum_mechanics" in updated.seen_articles
 
 
 def test_article_visit_adds_history_entry(client, mocker):
@@ -80,28 +70,13 @@ def test_article_visit_does_not_duplicate_history(client, mocker, signed_cookie_
         reading_history=[
             ReadingHistoryEntry(title="Quantum_mechanics", rating=3, scroll_depth=50)
         ],
-        seen_articles=["Quantum_mechanics"],
     )
     client.cookies.set("session", signed_cookie_for(profile))
     response = client.get("/article/Quantum_mechanics")
     updated = extract_profile(response)
     entries = [e for e in updated.reading_history if e.title == "Quantum_mechanics"]
     assert len(entries) == 1
-    assert entries[0].rating == 3  # existing rating preserved
-
-
-def test_article_visit_uses_canonical_title(client, mocker):
-    # URL slug uses underscore; Wikipedia returns title with space — canonical wins
-    article_with_space = ArticleSummary(
-        title="Music industry",
-        extract="The music industry...",
-        page_url="https://en.wikipedia.org/wiki/Music_industry",
-    )
-    mocker.patch("app.routes.pages.fetch_summary", return_value=article_with_space)
-    response = client.get("/article/Music_industry")
-    updated = extract_profile(response)
-    assert "Music industry" in updated.seen_articles
-    assert "Music_industry" not in updated.seen_articles
+    assert entries[0].rating == 3
 
 
 def test_article_page_shows_wikipedia_link(client, mocker):
@@ -113,11 +88,10 @@ def test_article_page_shows_wikipedia_link(client, mocker):
 def test_article_visit_from_another_article_stores_source(client, mocker):
     julius = ArticleSummary(title="Julius Caesar", extract="Roman general.", page_url="")
     mocker.patch("app.routes.pages.fetch_summary", return_value=julius)
-    # URL slug uses underscore; stored source should be normalized to spaces
     response = client.get("/article/Julius_Caesar?from=Roman_Empire")
     updated = extract_profile(response)
     entry = next(e for e in updated.reading_history if e.title == "Julius Caesar")
-    assert entry.source == "Roman Empire"  # normalized from "Roman_Empire"
+    assert entry.source == "Roman Empire"
 
 
 def test_article_visit_from_feed_has_no_source(client, mocker):

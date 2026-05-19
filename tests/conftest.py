@@ -35,15 +35,11 @@ def empty_profile() -> UserProfile:
 
 @pytest.fixture
 def returning_profile() -> UserProfile:
+    # current_articles / seen_articles / last_generated now live in IndexedDB,
+    # not in the signed cookie. The slim cookie only holds the three server-trusted fields.
     return UserProfile(
         timezone="UTC",
-        last_generated="2026-05-11",
         selected_categories=["Science", "History"],
-        current_articles=[
-            "Quantum_mechanics", "Roman_Empire", "Mathematics", "Science",
-            "History", "Philosophy", "Biology", "Chemistry"
-        ],
-        seen_articles=["Photosynthesis"],
         reading_history=[
             ReadingHistoryEntry(title="Photosynthesis", rating=None, scroll_depth=30),
         ],
@@ -54,14 +50,11 @@ def returning_profile() -> UserProfile:
 def warm_profile() -> UserProfile:
     return UserProfile(
         timezone="UTC",
-        last_generated="2026-05-11",
         selected_categories=["Science", "History"],
-        current_articles=["Article_A", "Article_B", "Article_C", "Article_D", "Article_E"],
-        seen_articles=["Old_Seen"],
         reading_history=[
             ReadingHistoryEntry(title="Quantum_mechanics", rating=5, scroll_depth=90),
-            ReadingHistoryEntry(title="Roman_Empire", rating=3, scroll_depth=50),
-            ReadingHistoryEntry(title="Photosynthesis", rating=2, scroll_depth=20),
+            ReadingHistoryEntry(title="Roman_Empire",      rating=3, scroll_depth=50),
+            ReadingHistoryEntry(title="Photosynthesis",    rating=2, scroll_depth=20),
         ],
     )
 
@@ -70,10 +63,7 @@ def warm_profile() -> UserProfile:
 def cold_profile() -> UserProfile:
     return UserProfile(
         timezone="UTC",
-        last_generated="2026-05-11",
         selected_categories=["Science"],
-        current_articles=["Article_A", "Article_B", "Article_C", "Article_D", "Article_E"],
-        seen_articles=[],
         reading_history=[
             ReadingHistoryEntry(title="Quantum_mechanics", rating=4, scroll_depth=80),
         ],

@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -9,8 +10,7 @@ from app.dependencies import get_user_profile
 from app.models import ReadingHistoryEntry, UserProfile
 from app.services.cookie import dump_profile
 from app.services.recommendations import CATEGORY_SEED_POOL
-from app.services.reset import get_local_date, needs_reset
-from app.services.wikipedia import fetch_summaries_bulk, fetch_summary, fetch_wiki_page, inject_article_chrome
+from app.services.wikipedia import fetch_summary, fetch_wiki_page, inject_article_chrome
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -71,23 +71,25 @@ async def home(
     if not profile.selected_categories and not profile.custom_interests:
         return RedirectResponse(url="/onboarding", status_code=302)
 
-    is_new_day = needs_reset(profile)
-    if is_new_day:
-        # Advance last_generated so we don't re-trigger on every request before JS refresh completes.
-        # Archiving and feed generation happen in POST /api/refresh, called automatically by JS.
-        profile.last_generated = get_local_date(profile.timezone).isoformat()
-
-    articles = await fetch_summaries_bulk(profile.current_articles)
+    # Inject profile data so JS can initialise IndexedDB on first load.
+    # The httpOnly cookie is unreadable by JS; this one-time inline script
+    # bridges the gap without a separate non-httpOnly cookie.
+    init_data = json.dumps({
+        "timezone": profile.timezone,
+        "selected_categories": profile.selected_categories,
+        "custom_interests": profile.custom_interests,
+        "reading_history": [e.model_dump() for e in profile.reading_history],
+    })
 
     resp = templates.TemplateResponse(
         request,
         "feed.html",
         {
-            "articles": articles,
-            "is_new_day": is_new_day,
             "history_groups": _group_history(profile.reading_history),
+            "init_data": init_data,
         },
     )
+    # Re-issue cookie on every home visit to keep its TTL fresh.
     resp.set_cookie(
         key=settings.cookie_name,
         value=dump_profile(profile),
@@ -117,10 +119,9 @@ async def article_detail(
     # entries are consistent regardless of how the user arrived at this page.
     canonical = article.title if article else title
 
-    if canonical not in profile.seen_articles:
-        profile.seen_articles.append(canonical)
+    # Update reading_history in the signed cookie so /api/score has fresh data.
+    # seen_articles tracking has moved to client-side IndexedDB.
     if not any(e.title == canonical for e in profile.reading_history):
-        # Normalize URL slug underscores to spaces so the source chain resolves.
         canonical_source = from_title.replace("_", " ") if from_title else None
         profile.reading_history.append(
             ReadingHistoryEntry(title=canonical, rating=None, scroll_depth=0, source=canonical_source)
@@ -130,10 +131,8 @@ async def article_detail(
     current_rating = existing.rating if existing else None
 
     if wiki_html:
-        # Full proxied Wikipedia page — inject our header and return as HTML
         resp = HTMLResponse(content=inject_article_chrome(wiki_html, canonical, current_rating))
     else:
-        # Fallback: render summary extract in our own template
         resp = templates.TemplateResponse(
             request,
             "article.html",

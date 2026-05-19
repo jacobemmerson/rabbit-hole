@@ -3,7 +3,7 @@ import math
 from datetime import date
 
 from app.config import settings
-from app.models import UserProfile
+from app.models import ArticleSummary, CandidateItem, UserProfile
 from app.services import embeddings
 from app.services.wikipedia import (
     fetch_search,
@@ -377,9 +377,96 @@ async def generate_warm_user(profile: UserProfile, seen: set[str]) -> list[str]:
     return [t for t, _ in scored[: settings.feed_size]]
 
 
-async def generate_feed(profile: UserProfile) -> list[str]:
-    # Exclude both permanently-visited and recently-shown articles from candidates.
-    seen = set(profile.seen_articles) | set(profile.shown_articles) | set(profile.current_articles)
+def score_candidates_for_profile(
+    profile: UserProfile,
+    candidates: list[CandidateItem],
+    history_extracts: dict[str, str],
+    n: int = 8,
+) -> list[str]:
+    """Score and rank pre-fetched candidates using the server-side embedding model.
+
+    Called by POST /api/score. Candidates and history extracts arrive from the
+    client (IndexedDB); only rating/scroll weights are read from the signed cookie.
+    No Wikipedia I/O — purely CPU-bound embedding + scoring.
+    """
+    history_summaries = [
+        ArticleSummary(title=e.title, extract=history_extracts[e.title], page_url="")
+        for e in profile.reading_history
+        if e.title in history_extracts and history_extracts[e.title]
+    ]
+    candidate_summaries = [
+        ArticleSummary(title=c.title, extract=c.extract, page_url="")
+        for c in candidates
+    ]
+
+    taste_vector = embeddings.compute_taste_vector(profile, history_summaries)
+
+    popularity = get_popularity()
+
+    def _pop_score(title: str) -> float:
+        rank = popularity.get(title)
+        return 0.0 if rank is None else math.exp(-(rank - 1) / 150)
+
+    n_hist = len(profile.reading_history)
+    pop_weight = max(0.20, 0.4 * math.exp(-n_hist * 0.05))
+    remaining = 1.0 - pop_weight
+    alpha = min(n_hist / 20, 1.0)
+    embed_weight = alpha * remaining
+    cat_weight = (1.0 - alpha) * remaining
+
+    if taste_vector is not None:
+        embed_scores = embeddings.score_candidates(taste_vector, candidate_summaries)
+    else:
+        embed_scores = {}
+
+    max_count = max((1 for _ in candidates), default=1)
+    # appearance_count proxy: each candidate appears once (client already deduped)
+    cat_scores = {c.title: 1.0 for c in candidates}
+
+    scored = [
+        (c.title,
+         embed_weight * embed_scores.get(c.title, 0.0)
+         + cat_weight * cat_scores.get(c.title, 0.0)
+         + pop_weight * _pop_score(c.title))
+        for c in candidates
+    ]
+
+    custom_keys = [f"__custom__{i}" for i, t in enumerate(profile.custom_interests) if t.strip()]
+    all_group_keys = profile.selected_categories + custom_keys
+
+    if len(all_group_keys) > 1:
+        group_source = {c.title: c.group for c in candidates}
+        cat_buckets: dict[str, list[str]] = {k: [] for k in all_group_keys}
+        overflow: list[tuple[str, float]] = []
+        for title, score in sorted(scored, key=lambda x: x[1], reverse=True):
+            group = group_source.get(title)
+            if group in cat_buckets:
+                cat_buckets[group].append(title)
+            else:
+                overflow.append((title, score))
+
+        results = _round_robin(cat_buckets, all_group_keys, set(), n)
+        picked = set(results)
+        for title, _ in overflow:
+            if len(results) >= n:
+                break
+            if title not in picked:
+                results.append(title)
+                picked.add(title)
+        return results
+
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return [t for t, _ in scored[:n]]
+
+
+async def generate_feed(profile: UserProfile, seen: set[str] | None = None) -> list[str]:
+    """Dispatch to cold-start or warm-user generation.
+
+    `seen` is now caller-supplied (it previously came from profile fields that have
+    moved to client-side IndexedDB). Pass an empty set for test convenience.
+    """
+    if seen is None:
+        seen = set()
     if len(profile.reading_history) < 3:
         return await generate_cold_start(
             profile.selected_categories, list(seen),

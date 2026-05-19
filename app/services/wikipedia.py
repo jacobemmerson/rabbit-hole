@@ -266,7 +266,7 @@ def inject_article_chrome(html: str, page_title: str, current_rating: int | None
     # Inject header right after <body>, then the rating hint overlay
     html = re.sub(r'(<body\b[^>]*>)', r'\1' + header + rating_hint, html, count=1, flags=re.IGNORECASE)
     # Inject our JS before </body>
-    html = html.replace('</body>', '<script src="/static/main.js" defer></script>\n</body>', 1)
+    html = html.replace('</body>', '<script type="module" src="/static/main.js"></script>\n</body>', 1)
     return html
 
 

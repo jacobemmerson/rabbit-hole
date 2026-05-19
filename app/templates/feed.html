@@ -50,6 +50,95 @@
     #refresh-btn:hover { border-color: #93c5fd; color: #2563eb; }
     #refresh-btn:disabled { opacity: .5; cursor: default; }
 
+    #clear-data-btn {
+      background: none;
+      border: none;
+      font-size: .75rem;
+      color: #d1d5db;
+      cursor: pointer;
+      font-family: inherit;
+      padding: .2rem .4rem;
+      border-radius: 4px;
+      transition: color .12s;
+    }
+    #clear-data-btn:hover { color: #9ca3af; }
+
+    .clear-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 1rem;
+    }
+    .clear-modal-overlay.open { display: flex; }
+
+    .clear-modal-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 1.75rem 2rem;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      font-family: system-ui, sans-serif;
+    }
+
+    .clear-modal-card h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #111;
+      margin-bottom: .75rem;
+    }
+
+    .clear-modal-card p {
+      font-size: .875rem;
+      color: #6b7280;
+      line-height: 1.55;
+      margin-bottom: 1.25rem;
+    }
+
+    .clear-modal-card .local-note {
+      font-size: .8rem;
+      color: #374151;
+      background: #f3f4f6;
+      border-radius: 8px;
+      padding: .65rem .85rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+
+    .clear-modal-actions {
+      display: flex;
+      gap: .75rem;
+      justify-content: flex-end;
+    }
+
+    .clear-modal-actions button {
+      padding: .55rem 1.1rem;
+      border-radius: 8px;
+      font-size: .875rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      border: none;
+      transition: background .12s, opacity .12s;
+    }
+
+    #clear-cancel-btn {
+      background: #f3f4f6;
+      color: #374151;
+    }
+    #clear-cancel-btn:hover { background: #e5e7eb; }
+
+    #clear-confirm-btn {
+      background: #dc2626;
+      color: #fff;
+    }
+    #clear-confirm-btn:hover { background: #b91c1c; }
+    #clear-confirm-btn:disabled { opacity: .5; cursor: default; }
+
     /* ── Two-column layout ── */
     .layout {
       display: grid;
@@ -296,12 +385,78 @@
       .sidebar-children { grid-template-rows: 0fr; }
       .sidebar-group:hover .sidebar-children { grid-template-rows: 1fr; }
     }
+
+    /* ── Wordmark rabbit animation ─────────────────────────────────── */
+    .rabbit-stage {
+      display: inline-block;
+      position: relative;
+      width: 28px; height: 28px;
+      vertical-align: middle;
+      margin-left: 3px;
+      overflow: visible;
+    }
+    .rabbit-mover {
+      position: absolute;
+      top: 0; left: 0;
+      animation: rabbit-move 6s linear infinite;
+    }
+    .rabbit-disp {
+      display: block;
+      width: 28px; height: 28px;
+      animation: rabbit-face 6s step-end infinite;
+    }
+    .rabbit-gif {
+      position: absolute;
+      top: 0; left: 0;
+      height: 28px; width: auto;
+    }
+    .rabbit-gif-idle { animation: rabbit-show-idle 6s step-end infinite; }
+    .rabbit-gif-hop  { opacity: 0; animation: rabbit-show-hop 6s step-end infinite; }
+
+    @keyframes rabbit-move {
+      0%   { transform: translateX(0);    animation-timing-function: step-end; }
+      25%  { transform: translateX(0);    animation-timing-function: ease-in-out; }
+      50%  { transform: translateX(30px); animation-timing-function: step-end; }
+      75%  { transform: translateX(30px); animation-timing-function: ease-in-out; }
+      100% { transform: translateX(0); }
+    }
+    @keyframes rabbit-face {
+      0%    { transform: scaleX(1); }
+      62.5% { transform: scaleX(-1); }
+      100%  { transform: scaleX(-1); }
+    }
+    @keyframes rabbit-show-idle {
+      0%, 50%  { opacity: 1; }
+      25%, 75% { opacity: 0; }
+      100%     { opacity: 1; }
+    }
+    @keyframes rabbit-show-hop {
+      0%, 50%  { opacity: 0; }
+      25%, 75% { opacity: 1; }
+      100%     { opacity: 0; }
+    }
   </style>
 </head>
 <body>
 
 <div class="top-bar">
-  <a href="/" class="wordmark">Rabbit Hole 🕳️</a>
+  <a href="/" class="wordmark">Rabbit Hole<span class="rabbit-stage" aria-hidden="true"><span class="rabbit-mover"><span class="rabbit-disp"><img class="rabbit-gif rabbit-gif-idle" src="/media/idle.gif" alt=""><img class="rabbit-gif rabbit-gif-hop" src="/media/hopping.gif" alt=""></span></span></span></a>
+  <button id="clear-data-btn" title="Clear all data">Clear data</button>
+</div>
+
+<!-- Clear data confirmation modal -->
+<div class="clear-modal-overlay" id="clear-modal">
+  <div class="clear-modal-card">
+    <h2>Clear all your data?</h2>
+    <p>This will permanently delete your reading history, ratings, category preferences, and custom interests, then return you to the setup screen.</p>
+    <div class="local-note">
+      🔒 All your data is stored locally on this device — in a signed cookie and your browser's IndexedDB. Nothing is sent to any third-party server.
+    </div>
+    <div class="clear-modal-actions">
+      <button id="clear-cancel-btn">Cancel</button>
+      <button id="clear-confirm-btn">Clear everything</button>
+    </div>
+  </div>
 </div>
 
 <div class="layout">
@@ -351,24 +506,18 @@
   <!-- Feed column (right) -->
   <div class="feed-col">
 
-    <!-- Tab navigation — "New" badge sits in the tab bar so panel heights stay equal -->
+    <!-- Tab navigation -->
     <div class="tab-nav">
       <button class="tab-btn active" id="tab-btn-for-you">For You</button>
       <button class="tab-btn" id="tab-btn-top-daily">Top Daily</button>
-      {% if is_new_day %}<span class="new-day-badge" style="align-self:center;margin-left:.5rem;">New</span>{% endif %}
     </div>
 
     <div class="panel-container" id="panel-container">
 
-      <!-- For You panel -->
+      <!-- For You panel — articles populated by feed.js via IndexedDB -->
       <div class="panel" id="panel-for-you" style="scroll-snap-align:start;">
-        <div id="feed" class="article-grid"{% if is_new_day %} data-auto-refresh="true"{% endif %}>
-          {% for article in articles %}
-          <a href="/article/{{ article.title }}" class="article-card">
-            <h2>{{ article.title }}</h2>
-            <p>{{ article.extract[:200] }}{% if article.extract|length > 200 %}…{% endif %}</p>
-          </a>
-          {% endfor %}
+        <div id="feed" class="article-grid">
+          <p class="grid-message" id="feed-loading">Loading…</p>
         </div>
         <div style="display:flex;justify-content:center;margin-top:1rem;">
           <button id="refresh-btn">↺ Refresh</button>
@@ -388,6 +537,8 @@
 
 </div>
 
-<script src="/static/main.js" defer></script>
+<!-- Server injects profile so JS can seed IndexedDB without reading the httpOnly cookie -->
+<script>window.__RH_INIT__ = {{ init_data | safe }};</script>
+<script type="module" src="/static/main.js"></script>
 </body>
 </html>

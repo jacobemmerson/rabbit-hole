@@ -9,14 +9,13 @@ class ReadingHistoryEntry(BaseModel):
 
 
 class UserProfile(BaseModel):
+    # Fields kept in the signed cookie — only what the server needs to trust.
+    # All other state (current_articles, seen_articles, shown_articles,
+    # last_generated) lives in the client's IndexedDB.
     timezone: str = "UTC"
-    last_generated: str | None = None
     selected_categories: list[str] = []
-    current_articles: list[str] = []
-    seen_articles: list[str] = []
+    custom_interests: list[str] = []
     reading_history: list[ReadingHistoryEntry] = []
-    shown_articles: list[str] = []   # recently displayed; excluded temporarily from recommendations
-    custom_interests: list[str] = []  # free-text interests embedded directly into the taste vector
 
     def article_weight(self, title: str) -> float:
         rating_map = {1: 0.2, 2: 0.5, 3: 1.0, 4: 1.5, 5: 2.0}
@@ -39,6 +38,19 @@ class ArticleSummary(BaseModel):
     page_type: str = "standard"  # "standard", "disambiguation", "no-extract"
 
 
+class CandidateItem(BaseModel):
+    title: str
+    extract: str
+    group: str  # category name or "__custom__N"
+
+
+class ScoreRequest(BaseModel):
+    candidates: list[CandidateItem]
+    history_extracts: dict[str, str] = {}  # title → extract, provided by client from IndexedDB
+    n: int = 8
+
+
+# FeedResponse kept for any callers that still reference it during migration
 class FeedResponse(BaseModel):
     articles: list[ArticleSummary]
     is_new_day: bool

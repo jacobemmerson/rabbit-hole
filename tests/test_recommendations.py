@@ -5,7 +5,7 @@ import pytest
 
 import app.services.embeddings as emb
 from app.models import ArticleSummary, ReadingHistoryEntry, UserProfile
-from app.services.recommendations import generate_cold_start, generate_feed
+from app.services.recommendations import generate_cold_start, generate_feed  # noqa: F401
 
 
 def _make_mock_model(seed: int = 42) -> MagicMock:

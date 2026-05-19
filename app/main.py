@@ -44,6 +44,7 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     application = FastAPI(title="Rabbit Hole", lifespan=lifespan, debug=settings.debug)
     application.mount("/static", StaticFiles(directory="app/static"), name="static")
+    application.mount("/media",  StaticFiles(directory="app/media"),  name="media")
     application.include_router(pages.router)
     application.include_router(api.router)
     return application
