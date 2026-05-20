@@ -1,4 +1,4 @@
-import { openDB, getProfile, setProfile, patchProfile, bulkGetSummaries } from './db.js';
+import { openDB, getProfile, setProfile, patchProfile, bulkGetSummaries, getBanditState, setBanditState, getPhi } from './db.js';
 import { topDailySummaries } from './wikipedia.js';
 import { needsReset, generateFeed, doRefresh, makeCard, renderCards } from './feed.js';
 
@@ -244,8 +244,26 @@ if (articleMeta) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: canonical, rating }),
         }).catch(err => console.error('Feedback failed:', err));
+
+        // Update bandit posterior: 👍 → 1.0, 👎 → 0.0
+        _updateBandit(canonical, rating === 5 ? 1.0 : 0.0);
       });
     });
+  }
+
+  // ── Bandit update helper ────────────────────────────────────────────────────
+  async function _updateBandit(title, reward) {
+    const [phi, banditState] = await Promise.all([getPhi(db, title), getBanditState(db)]);
+    if (!phi || !banditState) return;
+    try {
+      const res = await fetch('/api/bandit/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phi, reward, bandit_state: banditState }),
+      });
+      const data = await res.json();
+      if (data.bandit_state) await setBanditState(db, data.bandit_state);
+    } catch (err) { console.error('Bandit update failed:', err); }
   }
 
   // ── Scroll depth tracking ───────────────────────────────────────────────────
@@ -279,6 +297,14 @@ if (articleMeta) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: canonical, depth: milestone }),
         }).catch(err => console.error('Scroll ping failed:', err));
+
+        // Implicit bandit reward from scroll only when no explicit rating yet.
+        const profile = await getProfile(db);
+        const entry = (profile?.reading_history ?? []).find(e => e.title === canonical);
+        if (!entry?.rating) {
+          // Implicit reward decays toward 0.65: reward = 0.65 + 0.25·exp(−0.1·(depth−75))
+          if (milestone >= 75) _updateBandit(canonical, 0.65 + 0.25 * Math.exp(-0.1 * (milestone - 75)));
+        }
       }
     }
   }, { passive: true });

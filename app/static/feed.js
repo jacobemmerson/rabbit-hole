@@ -1,4 +1,4 @@
-import { getProfile, patchProfile, bulkGetSummaries } from './db.js';
+import { getProfile, patchProfile, bulkGetSummaries, getBanditState, setBanditState, setPhiMap } from './db.js';
 import { search, bulkSummaries } from './wikipedia.js';
 
 const FEED_SIZE     = 8;
@@ -71,10 +71,18 @@ export async function generateFeed(db) {
     ...(profile.current_articles ?? []),
   ]);
 
-  const searchJobs = groups.flatMap(g =>
-    g.queries.map(q => search(q, db).then(titles => ({ group: g.key, titles })))
+  // Include history-based searches so the bandit can learn the from_history signal.
+  const historySearchJobs = (profile.reading_history ?? []).map(e =>
+    search(e.title, db).then(titles => ({ group: '__history__', titles }))
   );
-  const searchResults = await Promise.all(searchJobs);
+
+  const [seedResults, historyResults] = await Promise.all([
+    Promise.all(groups.flatMap(g =>
+      g.queries.map(q => search(q, db).then(titles => ({ group: g.key, titles })))
+    )),
+    Promise.all(historySearchJobs),
+  ]);
+  const searchResults = [...seedResults, ...historyResults];
 
   // 3. Deduplicate into per-group buckets.
   const groupBuckets = {};
@@ -115,15 +123,25 @@ export async function generateFeed(db) {
     if (s.extract) historyExtracts[title] = s.extract;
   }
 
-  // 7. Server scores via embedding model (reads cookie for trusted rating/scroll weights).
+  // 7. Server scores via embedding model + bandit (reads cookie for trusted profile).
+  const banditState = await getBanditState(db);
   let rankedTitles = [];
   try {
     const res = await fetch('/api/score', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ candidates: candidatesWithExtracts, history_extracts: historyExtracts, n: FEED_SIZE }),
+      body: JSON.stringify({
+        candidates:       candidatesWithExtracts,
+        history_extracts: historyExtracts,
+        bandit_state:     banditState ?? null,
+        n:                FEED_SIZE,
+      }),
     });
-    rankedTitles = (await res.json()).titles ?? [];
+    const data = await res.json();
+    rankedTitles = data.titles ?? [];
+    // Store feature vectors so the client can update the bandit when feedback arrives.
+    if (data.phi_map)      await setPhiMap(db, data.phi_map);
+    if (data.bandit_state) await setBanditState(db, data.bandit_state);
   } catch {
     // Fallback: take first FEED_SIZE candidates by group order.
     rankedTitles = candidatesWithExtracts.slice(0, FEED_SIZE).map(c => c.title);

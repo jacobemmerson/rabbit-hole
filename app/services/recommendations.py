@@ -3,8 +3,8 @@ import math
 from datetime import date
 
 from app.config import settings
-from app.models import ArticleSummary, CandidateItem, UserProfile
-from app.services import embeddings
+from app.models import ArticleSummary, BanditStateModel, CandidateItem, UserProfile
+from app.services import bandits, embeddings
 from app.services.wikipedia import (
     fetch_search,
     fetch_summaries_bulk,
@@ -292,6 +292,23 @@ async def _gather_candidates(
     return ordered[:MAX_CANDIDATES], appearance_counts, category_source
 
 
+def _max_embed_scores(
+    taste_vectors: list,
+    candidates: list[ArticleSummary],
+) -> dict[str, float]:
+    """Cosine similarity against each taste vector; take the max per candidate.
+
+    A candidate only needs to match ONE cluster to score well, which handles
+    users with genuinely diverse interests without a muddled centroid pulling
+    scores down across all topics.
+    """
+    per_vector = embeddings.score_candidates_multi(taste_vectors, candidates)
+    return {
+        c.title: max(s.get(c.title, 0.0) for s in per_vector)
+        for c in candidates
+    }
+
+
 async def generate_warm_user(profile: UserProfile, seen: set[str]) -> list[str]:
     candidate_titles, appearance_counts, category_source = await _gather_candidates(profile, seen)
 
@@ -310,14 +327,14 @@ async def generate_warm_user(profile: UserProfile, seen: set[str]) -> list[str]:
     history_summaries = [summary_map[t] for t in history_titles if t in summary_map]
     candidate_summaries = [summary_map[t] for t in candidate_titles if t in summary_map]
 
-    taste_vector = embeddings.compute_taste_vector(profile, history_summaries)
-    if taste_vector is None:
+    taste_vectors = embeddings.compute_taste_vectors(profile, history_summaries)
+    if taste_vectors is None:
         return await generate_cold_start(
             profile.selected_categories, list(seen),
             count=settings.feed_size, custom_interests=profile.custom_interests,
         )
 
-    embed_scores = embeddings.score_candidates(taste_vector, candidate_summaries)
+    embed_scores = _max_embed_scores(taste_vectors, candidate_summaries)
 
     max_count = max(appearance_counts.values(), default=1)
     cat_scores = {t: c / max_count for t, c in appearance_counts.items()}
@@ -381,13 +398,14 @@ def score_candidates_for_profile(
     profile: UserProfile,
     candidates: list[CandidateItem],
     history_extracts: dict[str, str],
+    bandit_state: "BanditStateModel | None" = None,
     n: int = 8,
-) -> list[str]:
-    """Score and rank pre-fetched candidates using the server-side embedding model.
+) -> tuple[list[str], dict[str, list[float]]]:
+    """Score and rank pre-fetched candidates using the embedding model + bandit.
 
-    Called by POST /api/score. Candidates and history extracts arrive from the
-    client (IndexedDB); only rating/scroll weights are read from the signed cookie.
-    No Wikipedia I/O — purely CPU-bound embedding + scoring.
+    Returns (ranked_titles, phi_map) where phi_map maps each candidate title to
+    its feature vector so the client can store it and use it for bandit updates
+    when the user provides feedback.
     """
     history_summaries = [
         ArticleSummary(title=e.title, extract=history_extracts[e.title], page_url="")
@@ -399,51 +417,55 @@ def score_candidates_for_profile(
         for c in candidates
     ]
 
-    taste_vector = embeddings.compute_taste_vector(profile, history_summaries)
-
     popularity = get_popularity()
 
     def _pop_score(title: str) -> float:
         rank = popularity.get(title)
         return 0.0 if rank is None else math.exp(-(rank - 1) / 150)
 
-    n_hist = len(profile.reading_history)
-    pop_weight = max(0.20, 0.4 * math.exp(-n_hist * 0.05))
-    remaining = 1.0 - pop_weight
-    alpha = min(n_hist / 20, 1.0)
-    embed_weight = alpha * remaining
-    cat_weight = (1.0 - alpha) * remaining
+    taste_vectors = embeddings.compute_taste_vectors(profile, history_summaries)
+    embed_scores_per_vec: list[dict[str, float]] = (
+        embeddings.score_candidates_multi(taste_vectors, candidate_summaries)
+        if taste_vectors is not None else []
+    )
 
-    if taste_vector is not None:
-        embed_scores = embeddings.score_candidates(taste_vector, candidate_summaries)
-    else:
-        embed_scores = {}
+    # Resolve bandit θ — fall back to default warm-start if no state supplied
+    bs = (
+        bandits.BanditState.from_dict(bandit_state.model_dump())
+        if bandit_state is not None
+        else bandits.default_state()
+    )
+    theta = bs.theta
 
-    max_count = max((1 for _ in candidates), default=1)
-    # appearance_count proxy: each candidate appears once (client already deduped)
-    cat_scores = {c.title: 1.0 for c in candidates}
+    custom_keys = {f"__custom__{i}" for i, t in enumerate(profile.custom_interests) if t.strip()}
+    selected_set = set(profile.selected_categories)
 
-    scored = [
-        (c.title,
-         embed_weight * embed_scores.get(c.title, 0.0)
-         + cat_weight * cat_scores.get(c.title, 0.0)
-         + pop_weight * _pop_score(c.title))
-        for c in candidates
-    ]
+    # Build φ and score every candidate
+    scored: list[tuple[str, float]] = []
+    phi_map: dict[str, list[float]] = {}
 
-    custom_keys = [f"__custom__{i}" for i, t in enumerate(profile.custom_interests) if t.strip()]
-    all_group_keys = profile.selected_categories + custom_keys
+    for c in candidates:
+        cat_score     = 1.0 if c.group in selected_set else 0.0
+        from_history  = 1.0 if (c.group not in selected_set and c.group not in custom_keys) else 0.0
+        phi = bandits.compute_phi(
+            embed_scores_per_vec, c.title,
+            _pop_score(c.title), cat_score, from_history,
+        )
+        phi_map[c.title] = phi
+        scored.append((c.title, bandits.score(phi, theta)))
 
+    # Category-aware round-robin preserves diversity (same as before)
+    all_group_keys = profile.selected_categories + sorted(custom_keys)
     if len(all_group_keys) > 1:
         group_source = {c.title: c.group for c in candidates}
         cat_buckets: dict[str, list[str]] = {k: [] for k in all_group_keys}
         overflow: list[tuple[str, float]] = []
-        for title, score in sorted(scored, key=lambda x: x[1], reverse=True):
+        for title, s in sorted(scored, key=lambda x: x[1], reverse=True):
             group = group_source.get(title)
             if group in cat_buckets:
                 cat_buckets[group].append(title)
             else:
-                overflow.append((title, score))
+                overflow.append((title, s))
 
         results = _round_robin(cat_buckets, all_group_keys, set(), n)
         picked = set(results)
@@ -453,10 +475,10 @@ def score_candidates_for_profile(
             if title not in picked:
                 results.append(title)
                 picked.add(title)
-        return results
+        return results, phi_map
 
     scored.sort(key=lambda x: x[1], reverse=True)
-    return [t for t, _ in scored[:n]]
+    return [t for t, _ in scored[:n]], phi_map
 
 
 async def generate_feed(profile: UserProfile, seen: set[str] | None = None) -> list[str]:

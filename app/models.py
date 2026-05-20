@@ -41,13 +41,28 @@ class ArticleSummary(BaseModel):
 class CandidateItem(BaseModel):
     title: str
     extract: str
-    group: str  # category name or "__custom__N"
+    group: str  # category name, "__custom__N", or "__history__"
+
+
+class BanditStateModel(BaseModel):
+    """Pydantic wrapper for API serialisation of bandits.BanditState."""
+    theta:     list[float]
+    A_flat:    list[float]
+    b:         list[float]
+    n_updates: int = 0
 
 
 class ScoreRequest(BaseModel):
-    candidates: list[CandidateItem]
-    history_extracts: dict[str, str] = {}  # title → extract, provided by client from IndexedDB
+    candidates:    list[CandidateItem]
+    history_extracts: dict[str, str] = {}
+    bandit_state:  BanditStateModel | None = None
     n: int = 8
+
+
+class BanditUpdateRequest(BaseModel):
+    phi:          list[float]
+    reward:       float
+    bandit_state: BanditStateModel
 
 
 # FeedResponse kept for any callers that still reference it during migration

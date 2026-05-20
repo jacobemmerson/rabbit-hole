@@ -8,7 +8,7 @@ export function openDB() {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
-      for (const name of ['profile', 'candidates', 'summaries']) {
+      for (const name of ['profile', 'candidates', 'summaries', 'bandit', 'phi']) {
         if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
       }
     };
@@ -16,6 +16,7 @@ export function openDB() {
     req.onerror  = ()  => reject(req.error);
   });
 }
+
 
 function _get(db, store, key) {
   return new Promise((resolve, reject) => {
@@ -83,4 +84,17 @@ export async function bulkGetSummaries(db, titles) {
 
 export async function bulkSetSummaries(db, summaries) {
   await Promise.all(summaries.map(s => setSummary(db, s.title, s)));
+}
+
+// ── Bandit state ──────────────────────────────────────────────────────────────
+
+export const getBanditState = (db) => _get(db, 'bandit', 'singleton');
+export const setBanditState = (db, state) => _put(db, 'bandit', 'singleton', state);
+
+// ── Per-article feature vectors (populated by /api/score, used for updates) ──
+
+export const getPhi    = (db, title)       => _get(db, 'phi', title);
+export const setPhi    = (db, title, phi)  => _put(db, 'phi', title, phi);
+export async function setPhiMap(db, phiMap) {
+  await Promise.all(Object.entries(phiMap).map(([title, phi]) => setPhi(db, title, phi)));
 }
