@@ -12,6 +12,11 @@ from app.services.wikipedia import (
 )
 
 MAX_CANDIDATES = 30
+# Score given to articles absent from the Wikimedia pageviews cache.
+# Non-zero so the bandit can learn the user's preference for popular vs niche
+# articles even when most personalised recommendations aren't trending.
+_POP_UNKNOWN = 0.01
+
 # Pool of search queries per category (8 per category).
 # Two are selected per day via daily rotation so consecutive feeds explore
 # different corners of each topic.
@@ -343,7 +348,7 @@ async def generate_warm_user(profile: UserProfile, seen: set[str]) -> list[str]:
 
     def _pop_score(title: str) -> float:
         rank = popularity.get(title)
-        return 0.0 if rank is None else math.exp(-(rank - 1) / 150)
+        return _POP_UNKNOWN if rank is None else math.exp(-(rank - 1) / 150)
 
     n = len(profile.reading_history)
     pop_weight = max(0.20, 0.4 * math.exp(-n * 0.05))
@@ -400,12 +405,16 @@ def score_candidates_for_profile(
     history_extracts: dict[str, str],
     bandit_state: "BanditStateModel | None" = None,
     n: int = 8,
+    taste_vectors: "list | None" = None,
 ) -> tuple[list[str], dict[str, list[float]]]:
     """Score and rank pre-fetched candidates using the embedding model + bandit.
 
     Returns (ranked_titles, phi_map) where phi_map maps each candidate title to
     its feature vector so the client can store it and use it for bandit updates
     when the user provides feedback.
+
+    Pass pre-computed taste_vectors to avoid re-embedding history when the caller
+    has already done so (e.g. the /api/score route also uses them for query gen).
     """
     history_summaries = [
         ArticleSummary(title=e.title, extract=history_extracts[e.title], page_url="")
@@ -421,9 +430,10 @@ def score_candidates_for_profile(
 
     def _pop_score(title: str) -> float:
         rank = popularity.get(title)
-        return 0.0 if rank is None else math.exp(-(rank - 1) / 150)
+        return _POP_UNKNOWN if rank is None else math.exp(-(rank - 1) / 150)
 
-    taste_vectors = embeddings.compute_taste_vectors(profile, history_summaries)
+    if taste_vectors is None:
+        taste_vectors = embeddings.compute_taste_vectors(profile, history_summaries)
     embed_scores_per_vec: list[dict[str, float]] = (
         embeddings.score_candidates_multi(taste_vectors, candidate_summaries)
         if taste_vectors is not None else []

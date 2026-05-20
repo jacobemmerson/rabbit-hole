@@ -50,7 +50,13 @@
     #refresh-btn:hover { border-color: #93c5fd; color: #2563eb; }
     #refresh-btn:disabled { opacity: .5; cursor: default; }
 
-    #clear-data-btn {
+    .top-bar-actions {
+      display: flex;
+      align-items: center;
+      gap: .25rem;
+    }
+
+    #dev-mode-btn, #clear-data-btn {
       background: none;
       border: none;
       font-size: .75rem;
@@ -61,7 +67,8 @@
       border-radius: 4px;
       transition: color .12s;
     }
-    #clear-data-btn:hover { color: #9ca3af; }
+    #dev-mode-btn:hover, #clear-data-btn:hover { color: #9ca3af; }
+    #dev-mode-btn.active { color: #6366f1; font-weight: 600; }
 
     .clear-modal-overlay {
       display: none;
@@ -441,7 +448,10 @@
 
 <div class="top-bar">
   <a href="/" class="wordmark">Rabbit Hole<span class="rabbit-stage" aria-hidden="true"><span class="rabbit-mover"><span class="rabbit-disp"><img class="rabbit-gif rabbit-gif-idle" src="/media/idle.gif" alt=""><img class="rabbit-gif rabbit-gif-hop" src="/media/hopping.gif" alt=""></span></span></span></a>
-  <button id="clear-data-btn" title="Clear all data">Clear data</button>
+  <div class="top-bar-actions">
+    <button id="dev-mode-btn" title="Toggle dev panel">Dev</button>
+    <button id="clear-data-btn" title="Clear all data">Clear data</button>
+  </div>
 </div>
 
 <!-- Clear data confirmation modal -->

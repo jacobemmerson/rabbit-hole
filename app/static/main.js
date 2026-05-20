@@ -1,6 +1,7 @@
 import { openDB, getProfile, setProfile, patchProfile, bulkGetSummaries, getBanditState, setBanditState, getPhi } from './db.js';
 import { topDailySummaries } from './wikipedia.js';
 import { needsReset, generateFeed, doRefresh, makeCard, renderCards } from './feed.js';
+import { renderDevPanel } from './dev.js';
 
 // ── IndexedDB init ────────────────────────────────────────────────────────────
 // __RH_INIT__ is injected by the server on GET / so JS can seed IndexedDB
@@ -26,10 +27,17 @@ if (typeof window.__RH_INIT__ !== 'undefined') {
     // Sync cookie fields back into IndexedDB profile on each visit so both
     // stay consistent even if one was updated by another tab or device.
     await patchProfile(db, (p) => {
-      p.timezone            = window.__RH_INIT__.timezone            ?? p.timezone;
-      p.selected_categories = window.__RH_INIT__.selected_categories ?? p.selected_categories;
-      p.custom_interests    = window.__RH_INIT__.custom_interests    ?? p.custom_interests;
-      p.reading_history     = window.__RH_INIT__.reading_history     ?? p.reading_history;
+      const newCats   = window.__RH_INIT__.selected_categories ?? p.selected_categories;
+      const newCustom = window.__RH_INIT__.custom_interests    ?? p.custom_interests;
+      // If the user's interests changed (e.g. re-onboarded), force a feed
+      // regeneration by clearing last_generated so needsReset() returns true.
+      const catsChanged   = JSON.stringify([...newCats].sort())   !== JSON.stringify([...(p.selected_categories ?? [])].sort());
+      const customChanged = JSON.stringify(newCustom) !== JSON.stringify(p.custom_interests ?? []);
+      p.timezone            = window.__RH_INIT__.timezone ?? p.timezone;
+      p.selected_categories = newCats;
+      p.custom_interests    = newCustom;
+      p.reading_history     = window.__RH_INIT__.reading_history ?? p.reading_history;
+      if (catsChanged || customChanged) p.last_generated = null;
       return p;
     });
   }
@@ -45,6 +53,23 @@ if (feedEl) {
 
   const profile = await getProfile(db);
 
+  // Apply any pending bandit update stored synchronously during a pagehide.
+  // This runs before feed generation so the updated θ is used immediately.
+  const _pendingRaw = localStorage.getItem('rh_pending_bandit');
+  if (_pendingRaw) {
+    localStorage.removeItem('rh_pending_bandit');
+    try {
+      const _pending = JSON.parse(_pendingRaw);
+      const _res = await fetch('/api/bandit/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(_pending),
+      });
+      const _data = await _res.json();
+      if (_data.bandit_state) await setBanditState(db, _data.bandit_state);
+    } catch {}
+  }
+
   // Render cached articles instantly, then refresh if the day has rolled over.
   if (profile?.current_articles?.length) {
     const cached = await bulkGetSummaries(db, profile.current_articles);
@@ -55,6 +80,32 @@ if (feedEl) {
   if (needsReset(profile)) {
     await doRefresh(db, null);
   }
+
+  // ── Dev panel toggle ────────────────────────────────────────────────────────
+  const DEV_KEY  = 'rh_dev_mode';
+  const isDevOn  = () => localStorage.getItem(DEV_KEY) === '1';
+  const devBtn   = document.getElementById('dev-mode-btn');
+
+  async function _showDevPanel() {
+    try { await renderDevPanel(db); } catch (err) { console.error('Dev panel failed:', err); }
+  }
+
+  if (devBtn) {
+    const _syncDevBtn = () => devBtn.classList.toggle('active', isDevOn());
+    devBtn.addEventListener('click', async () => {
+      localStorage.setItem(DEV_KEY, isDevOn() ? '0' : '1');
+      if (isDevOn()) {
+        await _showDevPanel();
+      } else {
+        document.getElementById('dev-panel')?.remove();
+        localStorage.removeItem('rh_theta_prev');
+      }
+      _syncDevBtn();
+    });
+    _syncDevBtn();
+  }
+
+  if (isDevOn()) await _showDevPanel();
 
   // ── Tab switching ───────────────────────────────────────────────────────────
   const panelContainer = document.getElementById('panel-container');
@@ -119,7 +170,10 @@ if (feedEl) {
   // ── Refresh button ──────────────────────────────────────────────────────────
   const refreshBtn = document.getElementById('refresh-btn');
   if (refreshBtn) {
-    refreshBtn.addEventListener('click', () => doRefresh(db, refreshBtn));
+    refreshBtn.addEventListener('click', async () => {
+      await doRefresh(db, refreshBtn);
+      if (isDevOn()) await _showDevPanel();
+    });
   }
 
   // ── Clear data modal ────────────────────────────────────────────────────────
@@ -151,8 +205,14 @@ if (feedEl) {
           const req = indexedDB.deleteDatabase('rabbit-hole');
           req.onsuccess = resolve;
           req.onerror   = () => reject(req.error);
+          // db.close() initiates the close but in-flight transactions may still be
+          // running. onblocked fires if the connection isn't fully shut yet; resolving
+          // here lets the delete proceed once those transactions drain.
+          req.onblocked = resolve;
         });
-        // 3. Return to onboarding.
+        // 4. Wipe localStorage (article rewards, pending bandit update, dev state…).
+        localStorage.clear();
+        // 5. Return to onboarding.
         window.location.href = '/onboarding';
       } catch (err) {
         console.error('Clear failed:', err);
@@ -199,19 +259,36 @@ if (articleMeta) {
     return p;
   });
 
+  // ── Cumulative bandit reward (sent once on exit) ───────────────────────────
+  // Pre-fetch phi and bandit state synchronously so they're available in the
+  // pagehide handler, which cannot await async IDB reads.
+  let _pendingReward     = 0.3;   // baseline click reward
+  let _hasExplicitRating = false;
+  let _updateSent        = false;
+  const [_phi, _banditState] = await Promise.all([getPhi(db, canonical), getBanditState(db)]);
+
+  // High-water reward for this article across all visits.  Guards against
+  // repeated click-and-back inflating the bandit — we only send an update when
+  // this visit produces a strictly stronger signal than any previous one.
+  const _RW_KEY = 'rh_article_rewards';
+  let _prevReward = -1;
+  try {
+    const _rw = JSON.parse(localStorage.getItem(_RW_KEY) || '{}');
+    _prevReward = _rw[canonical] ?? -1;
+  } catch {}
+
   // ── One-time rating hint ────────────────────────────────────────────────────
   const ratingHint = document.getElementById('rh-rating-hint');
   if (ratingHint && !localStorage.getItem('rh_rating_hint')) {
     ratingHint.style.display = 'flex';
-    document.getElementById('rh-hint-dismiss').addEventListener('click', () => {
+    document.getElementById('rh-hint-dismiss')?.addEventListener('click', () => {
       ratingHint.style.display = 'none';
       localStorage.setItem('rh_rating_hint', '1');
-      const tw = document.getElementById('thumbs-widget');
-      if (tw) {
-        tw.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
-        tw.style.transform  = 'scale(1.4)';
-        tw.style.opacity    = '1';
-        setTimeout(() => { tw.style.transform = 'scale(1)'; }, 300);
+      // Pulse the pill to draw attention to it after dismissing the hint.
+      const pill = document.getElementById('thumbs-widget');
+      if (pill) {
+        pill.classList.add('pulse');
+        setTimeout(() => pill.classList.remove('pulse'), 400);
       }
     });
   }
@@ -219,16 +296,45 @@ if (articleMeta) {
   // ── Thumbs rating widget ────────────────────────────────────────────────────
   const thumbsWidget = document.getElementById('thumbs-widget');
   if (thumbsWidget) {
+    const indicator = thumbsWidget.querySelector('.pill-indicator');
+    const toggleBtn = thumbsWidget.querySelector('.pill-toggle');
+
     function renderThumbs(selected) {
       thumbsWidget.querySelectorAll('.thumb').forEach(btn => {
         btn.style.opacity = (parseInt(btn.dataset.rating) === selected) ? '1' : '0.35';
       });
     }
+    function minimizePill() { thumbsWidget.classList.add('minimized'); }
+    function expandPill()   { thumbsWidget.classList.remove('minimized'); }
+
+    // Seed indicator from any pre-existing rating (article revisit).
+    const _savedRating = parseInt(thumbsWidget.dataset.saved || '0');
+    if (_savedRating && indicator) indicator.textContent = _savedRating === 5 ? '👍' : '👎';
+
+    // Show immediately — a rAF ensures the initial hidden state is painted first
+    // so the slide-up transition actually plays.
+    requestAnimationFrame(() => thumbsWidget.classList.add('visible'));
+
+    // Toggle button: collapse ↔ expand.
+    toggleBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      thumbsWidget.classList.contains('minimized') ? expandPill() : minimizePill();
+    });
+
+    // Tapping the pill while minimized expands it.
+    thumbsWidget.addEventListener('click', () => {
+      if (thumbsWidget.classList.contains('minimized')) expandPill();
+    });
 
     thumbsWidget.querySelectorAll('.thumb').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();  // don't trigger the pill's expand handler
         const rating = parseInt(btn.dataset.rating);
         renderThumbs(rating);
+
+        // Update indicator and auto-minimize after brief feedback pause.
+        if (indicator) indicator.textContent = rating === 5 ? '👍' : '👎';
+        setTimeout(minimizePill, 600);
 
         // Optimistic IndexedDB update.
         await patchProfile(db, (p) => {
@@ -245,26 +351,43 @@ if (articleMeta) {
           body: JSON.stringify({ title: canonical, rating }),
         }).catch(err => console.error('Feedback failed:', err));
 
-        // Update bandit posterior: 👍 → 1.0, 👎 → 0.0
-        _updateBandit(canonical, rating === 5 ? 1.0 : 0.0);
+        // Accumulate rating into pending reward — sent on exit.
+        _pendingReward     = rating === 5 ? 1.0 : 0.0;
+        _hasExplicitRating = true;
       });
     });
   }
 
-  // ── Bandit update helper ────────────────────────────────────────────────────
-  async function _updateBandit(title, reward) {
-    const [phi, banditState] = await Promise.all([getPhi(db, title), getBanditState(db)]);
-    if (!phi || !banditState) return;
+  // ── Deferred bandit update — fires once when the user leaves the article ────
+  window.addEventListener('pagehide', () => {
+    if (!_phi || !_banditState || _updateSent) return;
+    if (_pendingReward <= _prevReward) return;  // no stronger signal than a prior visit
+    _updateSent = true;
+    // Persist the new high-water reward before the page unloads.
     try {
-      const res = await fetch('/api/bandit/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phi, reward, bandit_state: banditState }),
-      });
-      const data = await res.json();
-      if (data.bandit_state) await setBanditState(db, data.bandit_state);
-    } catch (err) { console.error('Bandit update failed:', err); }
-  }
+      const _rw = JSON.parse(localStorage.getItem(_RW_KEY) || '{}');
+      _rw[canonical] = _pendingReward;
+      localStorage.setItem(_RW_KEY, JSON.stringify(_rw));
+    } catch {}
+    const payload = { phi: _phi, reward: _pendingReward, bandit_state: _banditState };
+    // localStorage.setItem is synchronous — it survives page unload reliably,
+    // unlike IDB writes.  The feed page picks this up on next load and applies
+    // it before generating the feed so the updated θ is used immediately.
+    try { localStorage.setItem('rh_pending_bandit', JSON.stringify(payload)); } catch {}
+    // Also fire a keepalive fetch; if the response arrives before teardown,
+    // IDB is updated and the localStorage entry is cleared (no double-apply).
+    fetch('/api/bandit/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      keepalive: true,
+    }).then(r => r.json()).then(data => {
+      if (data.bandit_state) {
+        setBanditState(db, data.bandit_state);
+        localStorage.removeItem('rh_pending_bandit');
+      }
+    }).catch(() => {});
+  });
 
   // ── Scroll depth tracking ───────────────────────────────────────────────────
   const milestones = [25, 50, 75, 100];
@@ -298,12 +421,11 @@ if (articleMeta) {
           body: JSON.stringify({ title: canonical, depth: milestone }),
         }).catch(err => console.error('Scroll ping failed:', err));
 
-        // Implicit bandit reward from scroll only when no explicit rating yet.
-        const profile = await getProfile(db);
-        const entry = (profile?.reading_history ?? []).find(e => e.title === canonical);
-        if (!entry?.rating) {
-          // Implicit reward decays toward 0.65: reward = 0.65 + 0.25·exp(−0.1·(depth−75))
-          if (milestone >= 75) _updateBandit(canonical, 0.65 + 0.25 * Math.exp(-0.1 * (milestone - 75)));
+        // Accumulate scroll reward — takes effect only if no explicit rating given.
+        // Math.max keeps the 75 % peak (≈0.90) from being downgraded by the
+        // 100 % milestone (≈0.67) if the user keeps scrolling.
+        if (milestone >= 75 && !_hasExplicitRating) {
+          _pendingReward = Math.max(_pendingReward, 0.65 + 0.25 * Math.exp(-0.1 * (milestone - 75)));
         }
       }
     }

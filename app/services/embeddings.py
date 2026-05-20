@@ -115,8 +115,13 @@ def compute_taste_vectors(
 
     pos_w = np.array(pos_weights, dtype=np.float32)
 
-    # Number of clusters scales with history depth; floor at 1
-    k = min(MAX_CLUSTERS, max(1, len(pos_texts) // MIN_CLUSTER_SIZE))
+    # Use total seen articles (pos + neg) for the cluster threshold so that
+    # disliked articles still count toward activating additional sim dimensions,
+    # even though they're excluded from the positive pool used for clustering.
+    # Cap k at len(pos_texts) so k-means always has at least k samples.
+    total_seen = len(pos_texts) + len(neg_texts)
+    k = min(MAX_CLUSTERS, max(1, total_seen // MIN_CLUSTER_SIZE))
+    k = min(k, max(1, len(pos_texts)))
 
     if k == 1:
         raw_vectors = [_weighted_mean(pos_embs, pos_w)]

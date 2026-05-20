@@ -1,4 +1,4 @@
-import { getProfile, patchProfile, bulkGetSummaries, getBanditState, setBanditState, setPhiMap } from './db.js';
+import { getProfile, patchProfile, bulkGetSummaries, getBanditState, setBanditState, setPhiMap, getLearnedQueries, setLearnedQueries } from './db.js';
 import { search, bulkSummaries } from './wikipedia.js';
 
 const FEED_SIZE     = 8;
@@ -52,7 +52,8 @@ export async function generateFeed(db) {
   const custom     = profile.custom_interests    ?? [];
 
   // 1. Fetch today's seed queries from the server (pure computation, no Wikipedia I/O).
-  const params = new URLSearchParams();
+  const historyLen = (profile.reading_history ?? []).length;
+  const params = new URLSearchParams({ history_len: historyLen });
   categories.forEach(c => params.append('categories[]', c));
   custom.forEach(c => params.append('custom[]', c));
 
@@ -62,8 +63,6 @@ export async function generateFeed(db) {
     groups = (await res.json()).groups ?? [];
   } catch { return; }
 
-  if (!groups.length) return;
-
   // 2. Wikipedia searches from the user's network (parallel, IndexedDB-cached).
   const seen = new Set([
     ...(profile.seen_articles   ?? []),
@@ -71,29 +70,44 @@ export async function generateFeed(db) {
     ...(profile.current_articles ?? []),
   ]);
 
+  // Load learned seed queries before the guard so they count as a valid source.
+  const learnedData    = await getLearnedQueries(db);
+  const learnedQueries = learnedData?.queries ?? [];
+  const hasHistory     = (profile.reading_history ?? []).length > 0;
+
+  // Exit only when all three candidate sources are empty — seed groups can be
+  // empty once the taper kicks in (history_len ≥ 8) while learned queries and
+  // history searches still provide candidates.
+  if (!groups.length && !learnedQueries.length && !hasHistory) return;
+
   // Include history-based searches so the bandit can learn the from_history signal.
   const historySearchJobs = (profile.reading_history ?? []).map(e =>
-    search(e.title, db).then(titles => ({ group: '__history__', titles }))
+    search(e.title, db).then(titles => ({ group: '__history__', titles, query: e.title }))
   );
 
-  const [seedResults, historyResults] = await Promise.all([
+  const [seedResults, historyResults, learnedResults] = await Promise.all([
     Promise.all(groups.flatMap(g =>
-      g.queries.map(q => search(q, db).then(titles => ({ group: g.key, titles })))
+      g.queries.map(q => search(q, db).then(titles => ({ group: g.key, titles, query: q })))
     )),
     Promise.all(historySearchJobs),
+    Promise.all(learnedQueries.map(q =>
+      search(q, db).then(titles => ({ group: '__learned__', titles, query: q }))
+    )),
   ]);
-  const searchResults = [...seedResults, ...historyResults];
+  const searchResults = [...seedResults, ...historyResults, ...learnedResults];
 
-  // 3. Deduplicate into per-group buckets.
+  // 3. Deduplicate into per-group buckets; track which learned query found each article.
   const groupBuckets = {};
+  const titleToQuery = {};  // article title → originating learned query (reward signal)
   const allocated = new Set(seen);
 
-  for (const { group, titles } of searchResults) {
+  for (const { group, titles, query } of searchResults) {
     if (!groupBuckets[group]) groupBuckets[group] = [];
     for (const title of titles) {
       if (_isValidArticle(title) && !allocated.has(title)) {
         groupBuckets[group].push(title);
         allocated.add(title);
+        if (group === '__learned__') titleToQuery[title] = query;
       }
     }
   }
@@ -142,6 +156,9 @@ export async function generateFeed(db) {
     // Store feature vectors so the client can update the bandit when feedback arrives.
     if (data.phi_map)      await setPhiMap(db, data.phi_map);
     if (data.bandit_state) await setBanditState(db, data.bandit_state);
+    if (data.seed_queries?.length) {
+      await setLearnedQueries(db, { queries: data.seed_queries, titleToQuery });
+    }
   } catch {
     // Fallback: take first FEED_SIZE candidates by group order.
     rankedTitles = candidatesWithExtracts.slice(0, FEED_SIZE).map(c => c.title);

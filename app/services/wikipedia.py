@@ -228,25 +228,68 @@ _THUMBS = [("👍", 5), ("👎", 1)]
 
 
 def inject_article_chrome(html: str, page_title: str, current_rating: int | None) -> str:
-    """Inject our app header (back button + thumbs rating) and main.js into the processed page.
+    """Inject our app header, rating pill, and main.js into the processed page.
     Called at serve time — not cached — because it contains the user's rating.
     """
-    thumbs = ''.join(
-        f'<span class="thumb" data-rating="{val}" '
-        f'style="cursor:pointer;font-size:1.3rem;opacity:{"1" if current_rating == val else "0.35"};">'
-        f'{emoji}</span>'
-        for emoji, val in _THUMBS
-    )
     header = (
         '<div id="rh-header" style="position:fixed;top:0;left:0;right:0;z-index:99999;'
         'background:#f8f9fa;border-bottom:1px solid #a2a9b1;padding:.4rem 1.25rem;'
         'display:flex;align-items:center;gap:.75rem;font-family:system-ui,sans-serif;font-size:.875rem;">'
         '<a href="/" style="color:#3366cc;text-decoration:none;flex-shrink:0;">← Back to feed</a>'
         f'<span style="color:#54595d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;">{page_title}</span>'
-        f'<div id="thumbs-widget" data-saved="{current_rating or ""}" style="display:flex;gap:.5rem;flex-shrink:0;">{thumbs}</div>'
         '</div>'
         f'<div id="article-meta" data-title="{page_title}" style="display:none;"></div>'
     )
+
+    thumbs_inner = ''.join(
+        f'<span class="thumb" data-rating="{val}" '
+        f'style="font-size:1.6rem;cursor:pointer;line-height:1;flex-shrink:0;user-select:none;'
+        f'transition:opacity .15s,transform .15s;opacity:{"1" if current_rating == val else "0.35"};">'
+        f'{emoji}</span>'
+        for emoji, val in _THUMBS
+    )
+    indicator_content = {5: '👍', 1: '👎'}.get(current_rating, '')
+    pill_css = (
+        '<style>'
+        '#thumbs-widget{'
+        'position:fixed;bottom:1.75rem;left:50%;'
+        'transform:translateX(-50%) translateY(14px);'
+        'display:flex;align-items:center;gap:.6rem;overflow:hidden;cursor:default;'
+        'background:rgba(255,255,255,0.97);border:1.5px solid #e5e7eb;'
+        'border-radius:100px;padding:.6rem 1rem .6rem 1.4rem;'
+        'box-shadow:0 4px 24px rgba(0,0,0,.12);'
+        'opacity:0;pointer-events:none;'
+        'transition:opacity .35s ease,transform .35s ease,bottom .3s ease,padding .3s ease,gap .3s ease;'
+        'z-index:99998;}'
+        '#thumbs-widget.visible{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0);}'
+        '#thumbs-widget.minimized{bottom:.6rem;padding:.35rem .85rem .35rem .95rem;gap:.3rem;cursor:pointer;}'
+        '.pill-rating{display:flex;gap:.75rem;max-width:5rem;overflow:hidden;'
+        'transition:max-width .3s ease,opacity .2s ease;}'
+        '#thumbs-widget.minimized .pill-rating{max-width:0;opacity:0;pointer-events:none;}'
+        '#thumbs-widget .thumb:hover{transform:scale(1.2);}'
+        '.pill-indicator{font-size:1.3rem;line-height:1;max-width:0;overflow:hidden;opacity:0;'
+        'flex-shrink:0;user-select:none;white-space:nowrap;'
+        'transition:max-width .3s ease,opacity .2s ease .1s;}'
+        '#thumbs-widget.minimized .pill-indicator{max-width:2rem;opacity:1;}'
+        '.pill-toggle{background:none;border:none;cursor:pointer;color:#9ca3af;'
+        'padding:.1rem .15rem;font-size:1rem;line-height:1;flex-shrink:0;'
+        'border-radius:4px;transition:color .15s,transform .3s ease;}'
+        '.pill-toggle:hover{color:#374151;}'
+        '#thumbs-widget.minimized .pill-toggle{transform:rotate(180deg);}'
+        '@keyframes rh-pill-pulse{'
+        '0%,100%{box-shadow:0 4px 24px rgba(0,0,0,.12);}'
+        '50%{box-shadow:0 4px 32px rgba(37,99,235,.4);}}'
+        '#thumbs-widget.pulse{animation:rh-pill-pulse .4s ease;}'
+        '</style>'
+    )
+    pill = (
+        f'<div id="thumbs-widget" data-saved="{current_rating or ""}">'
+        f'<div class="pill-rating">{thumbs_inner}</div>'
+        f'<span class="pill-indicator">{indicator_content}</span>'
+        f'<button class="pill-toggle" aria-label="Minimize rating">▾</button>'
+        f'</div>'
+    )
+
     rating_hint = (
         '<div id="rh-rating-hint" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;'
         'z-index:999999;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;padding:1rem;">'
@@ -255,7 +298,7 @@ def inject_article_chrome(html: str, page_title: str, current_rating: int | None
         '<div style="font-size:2rem;margin-bottom:.75rem;letter-spacing:.15em;">👍 👎</div>'
         '<p style="font-size:.95rem;font-weight:600;color:#111;margin-bottom:.4rem;">Rate what you read</p>'
         '<p style="font-size:.82rem;color:#6b7280;line-height:1.55;margin-bottom:1.25rem;">'
-        'Use the thumbs in the header to rate articles — your ratings help us find better recommendations.'
+        'Use the pill at the bottom to rate articles — your ratings help us find better recommendations.'
         '</p>'
         '<button id="rh-hint-dismiss" style="background:#2563eb;color:#fff;border:none;border-radius:8px;'
         'padding:.55rem 1.25rem;font-size:.875rem;font-weight:600;cursor:pointer;'
@@ -263,10 +306,14 @@ def inject_article_chrome(html: str, page_title: str, current_rating: int | None
         '</div></div>'
     )
 
-    # Inject header right after <body>, then the rating hint overlay
+    # Inject header + hint right after <body>
     html = re.sub(r'(<body\b[^>]*>)', r'\1' + header + rating_hint, html, count=1, flags=re.IGNORECASE)
-    # Inject our JS before </body>
-    html = html.replace('</body>', '<script type="module" src="/static/main.js"></script>\n</body>', 1)
+    # Inject pill CSS + pill element + our JS before </body>
+    html = html.replace(
+        '</body>',
+        pill_css + pill + '<script type="module" src="/static/main.js"></script>\n</body>',
+        1,
+    )
     return html
 
 
