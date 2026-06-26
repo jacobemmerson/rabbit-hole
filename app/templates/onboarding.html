@@ -4,12 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rabbit Hole — Pick your interests</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background: #f9f9f7;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: linear-gradient(160deg, #F8F7F4 0%, #F0EEE9 100%);
       min-height: 100vh;
       display: flex;
       align-items: center;
@@ -20,6 +23,7 @@
     .container {
       width: 100%;
       max-width: 600px;
+      padding: 3rem 2rem;
     }
 
     .wordmark {
@@ -28,30 +32,73 @@
       letter-spacing: .15em;
       text-transform: uppercase;
       color: #9ca3af;
-      margin-bottom: 2rem;
+      margin-bottom: 2.5rem;
+      margin-top: 1.5rem;
     }
 
     h1 {
-      font-size: 1.75rem;
+      font-size: 2.25rem;
       font-weight: 700;
       color: #111;
-      line-height: 1.2;
-      margin-bottom: .5rem;
+      line-height: 1.15;
+      margin-bottom: .65rem;
     }
 
     .subtitle {
       font-size: .95rem;
-      color: #6b7280;
-      margin-bottom: 2rem;
+      color: #6B7280;
+      margin-bottom: 2.5rem;
     }
 
-    /* Hidden checkboxes with pill labels */
+    /* Pill entrance animation */
+    @keyframes pillIn {
+      from { opacity: 0; transform: scale(0.94); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    /* Pill grid */
     .pill-grid {
       display: flex;
       flex-wrap: wrap;
       gap: .5rem;
       margin-bottom: 2rem;
     }
+
+    .pill {
+      animation: pillIn 0.3s ease both;
+    }
+
+    /* Staggered delays, nth-child 1–30, spread across 500 ms */
+    .pill-grid .pill:nth-child(1)  { animation-delay:   0ms; }
+    .pill-grid .pill:nth-child(2)  { animation-delay:  17ms; }
+    .pill-grid .pill:nth-child(3)  { animation-delay:  34ms; }
+    .pill-grid .pill:nth-child(4)  { animation-delay:  51ms; }
+    .pill-grid .pill:nth-child(5)  { animation-delay:  69ms; }
+    .pill-grid .pill:nth-child(6)  { animation-delay:  86ms; }
+    .pill-grid .pill:nth-child(7)  { animation-delay: 103ms; }
+    .pill-grid .pill:nth-child(8)  { animation-delay: 120ms; }
+    .pill-grid .pill:nth-child(9)  { animation-delay: 138ms; }
+    .pill-grid .pill:nth-child(10) { animation-delay: 155ms; }
+    .pill-grid .pill:nth-child(11) { animation-delay: 172ms; }
+    .pill-grid .pill:nth-child(12) { animation-delay: 190ms; }
+    .pill-grid .pill:nth-child(13) { animation-delay: 207ms; }
+    .pill-grid .pill:nth-child(14) { animation-delay: 224ms; }
+    .pill-grid .pill:nth-child(15) { animation-delay: 241ms; }
+    .pill-grid .pill:nth-child(16) { animation-delay: 259ms; }
+    .pill-grid .pill:nth-child(17) { animation-delay: 276ms; }
+    .pill-grid .pill:nth-child(18) { animation-delay: 293ms; }
+    .pill-grid .pill:nth-child(19) { animation-delay: 310ms; }
+    .pill-grid .pill:nth-child(20) { animation-delay: 328ms; }
+    .pill-grid .pill:nth-child(21) { animation-delay: 345ms; }
+    .pill-grid .pill:nth-child(22) { animation-delay: 362ms; }
+    .pill-grid .pill:nth-child(23) { animation-delay: 379ms; }
+    .pill-grid .pill:nth-child(24) { animation-delay: 397ms; }
+    .pill-grid .pill:nth-child(25) { animation-delay: 414ms; }
+    .pill-grid .pill:nth-child(26) { animation-delay: 431ms; }
+    .pill-grid .pill:nth-child(27) { animation-delay: 448ms; }
+    .pill-grid .pill:nth-child(28) { animation-delay: 466ms; }
+    .pill-grid .pill:nth-child(29) { animation-delay: 483ms; }
+    .pill-grid .pill:nth-child(30) { animation-delay: 500ms; }
 
     .pill input[type="checkbox"] {
       position: absolute;
@@ -64,27 +111,30 @@
       display: inline-flex;
       align-items: center;
       gap: .35rem;
-      padding: .45rem .9rem;
-      border: 1.5px solid #e5e7eb;
+      padding: .5rem 1.1rem;
+      border: 1px solid transparent;
       border-radius: 100px;
       background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
       font-size: .875rem;
       color: #374151;
       cursor: pointer;
       user-select: none;
-      transition: background .12s, border-color .12s, color .12s;
+      transition: all 0.15s ease;
       white-space: nowrap;
     }
 
     .pill label:hover {
-      border-color: #93c5fd;
-      background: #eff6ff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,.13);
+      border-color: transparent;
     }
 
     .pill input:checked + label {
-      background: #2563eb;
-      border-color: #2563eb;
+      background: #111;
+      border-color: #111;
       color: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,.2);
     }
 
     .pill .emoji {
@@ -92,7 +142,7 @@
       line-height: 1;
     }
 
-    /* Footer row: counter + button */
+    /* Footer row */
     .footer {
       display: flex;
       align-items: center;
@@ -103,28 +153,36 @@
     #counter {
       font-size: .875rem;
       color: #9ca3af;
+      transition: color 0.15s ease, font-weight 0.15s ease;
     }
 
-    #counter.has-selection { color: #2563eb; }
+    #counter.has-selection {
+      color: #111;
+      font-weight: 600;
+    }
 
     #submit-btn {
-      background: #2563eb;
+      background: #111;
       color: #fff;
       border: none;
-      border-radius: 8px;
-      padding: .65rem 1.5rem;
+      border-radius: 12px;
+      padding: .75rem 2rem;
       font-size: .95rem;
       font-weight: 600;
       cursor: pointer;
-      transition: background .12s, opacity .12s;
+      font-family: inherit;
+      transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
     }
 
     #submit-btn:disabled {
-      opacity: .45;
+      opacity: .4;
       cursor: default;
     }
 
-    #submit-btn:not(:disabled):hover { background: #1d4ed8; }
+    #submit-btn:not(:disabled):hover {
+      transform: scale(1.02);
+      background: #1a1a1a;
+    }
 
     #validation-msg {
       font-size: .8rem;
@@ -138,26 +196,40 @@
       display: inline-flex;
       align-items: center;
       gap: .35rem;
-      padding: .45rem .9rem;
-      border: 1.5px dashed #d1d5db;
+      padding: .5rem 1.1rem;
+      border: 1px dashed #d1d5db;
       border-radius: 100px;
-      background: transparent;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
       font-size: .875rem;
       color: #6b7280;
       cursor: pointer;
       font-family: inherit;
-      transition: border-color .12s, color .12s, background .12s;
+      transition: all 0.15s ease;
       white-space: nowrap;
     }
-    .pill-custom:hover { border-color: #93c5fd; color: #2563eb; background: #eff6ff; }
-    .pill-custom.has-interests { border-color: #2563eb; color: #2563eb; border-style: solid; }
+
+    .pill-custom:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,.10);
+    }
+
+    .pill-custom.has-interests {
+      background: #111;
+      color: #fff;
+      border-style: solid;
+      border-color: #111;
+      box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    }
 
     /* Modal overlay */
     .modal-overlay {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.4);
+      background: rgba(0,0,0,.35);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       align-items: center;
       justify-content: center;
       z-index: 100;
@@ -167,11 +239,11 @@
 
     .modal-card {
       background: #fff;
-      border-radius: 16px;
-      padding: 1.75rem;
+      border-radius: 24px;
+      padding: 2rem;
       width: 100%;
       max-width: 480px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      box-shadow: 0 24px 64px rgba(0,0,0,.20);
     }
 
     .modal-header {
@@ -182,63 +254,77 @@
     }
 
     .modal-header h2 {
-      font-size: 1.05rem;
+      font-size: 1.1rem;
       font-weight: 700;
       color: #111;
     }
 
     .modal-close {
-      background: none;
+      background: #f3f4f6;
       border: none;
-      font-size: 1.25rem;
-      color: #9ca3af;
+      border-radius: 50%;
+      width: 2rem;
+      height: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .9rem;
+      color: #6b7280;
       cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
       line-height: 1;
-      padding: .1rem .3rem;
+      flex-shrink: 0;
     }
-    .modal-close:hover { color: #374151; }
+    .modal-close:hover {
+      background: #e5e7eb;
+      color: #111;
+    }
 
     .modal-desc {
       font-size: .875rem;
       color: #6b7280;
       margin-bottom: 1.25rem;
-      line-height: 1.5;
+      line-height: 1.55;
     }
 
     .modal-input-row {
       display: flex;
       gap: .5rem;
-      margin-bottom: 1rem;
+      margin-bottom: .75rem;
     }
 
     .modal-input-row input[type="text"] {
       flex: 1;
-      padding: .5rem .75rem;
+      padding: .6rem .9rem;
       border: 1.5px solid #e5e7eb;
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: .875rem;
       font-family: inherit;
       color: #111;
+      background: #fafafa;
       outline: none;
-      transition: border-color .12s;
+      transition: border-color 0.15s ease, background 0.15s ease;
     }
-    .modal-input-row input[type="text"]:focus { border-color: #93c5fd; }
+    .modal-input-row input[type="text"]:focus {
+      border-color: #aaa;
+      background: #fff;
+    }
 
     .modal-add-btn {
-      padding: .5rem .9rem;
-      background: #2563eb;
+      padding: .6rem 1rem;
+      background: #111;
       color: #fff;
       border: none;
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: .875rem;
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
       white-space: nowrap;
-      transition: background .12s;
+      transition: background 0.15s ease, transform 0.15s ease;
     }
-    .modal-add-btn:hover { background: #1d4ed8; }
-    .modal-add-btn:disabled { opacity: .45; cursor: default; }
+    .modal-add-btn:hover { background: #1a1a1a; transform: scale(1.02); }
+    .modal-add-btn:disabled { opacity: .4; cursor: default; transform: none; }
 
     .modal-input-hint {
       font-size: .78rem;
@@ -260,65 +346,70 @@
       align-items: center;
       gap: .35rem;
       padding: .3rem .65rem .3rem .75rem;
-      background: #eff6ff;
-      border: 1.5px solid #bfdbfe;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
       border-radius: 100px;
       font-size: .82rem;
-      color: #1d4ed8;
+      color: #374151;
+      font-weight: 500;
     }
 
     .custom-chip button {
       background: none;
       border: none;
       cursor: pointer;
-      color: #93c5fd;
+      color: #9ca3af;
       font-size: 1rem;
       line-height: 1;
       padding: 0;
       display: flex;
       align-items: center;
+      transition: color 0.12s ease;
     }
-    .custom-chip button:hover { color: #2563eb; }
+    .custom-chip button:hover { color: #111; }
 
     .modal-done-btn {
       width: 100%;
-      padding: .6rem;
-      background: #f9fafb;
-      border: 1.5px solid #e5e7eb;
-      border-radius: 8px;
+      padding: .7rem;
+      background: #111;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
       font-size: .9rem;
       font-weight: 600;
-      color: #374151;
       cursor: pointer;
       font-family: inherit;
-      transition: background .12s, border-color .12s;
+      transition: background 0.15s ease, transform 0.15s ease;
     }
-    .modal-done-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
+    .modal-done-btn:hover {
+      background: #1a1a1a;
+      transform: scale(1.01);
+    }
 
     /* ToS modal */
     .tos-body { font-size: .875rem; color: #374151; line-height: 1.6; margin-bottom: 1.5rem; }
     .tos-body p { margin-bottom: .9rem; }
     .tos-body p:last-child { margin-bottom: 0; }
-    .tos-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: .6rem; margin-bottom: .9rem; }
+    .tos-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: .75rem; margin-bottom: .9rem; }
     .tos-list li { display: flex; gap: .6rem; }
     .tos-list li::before { content: ''; flex-shrink: 0; }
     .tos-list .tos-icon { flex-shrink: 0; font-size: 1rem; line-height: 1.6; }
     .tos-clear-note { font-size: .8rem; color: #9ca3af; border-top: 1px solid #f3f4f6; padding-top: .9rem; }
     .tos-actions { display: flex; gap: .75rem; justify-content: flex-end; }
     .tos-actions button {
-      padding: .55rem 1.1rem;
-      border-radius: 8px;
+      padding: .6rem 1.25rem;
+      border-radius: 10px;
       font-size: .875rem;
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
       border: none;
-      transition: background .12s;
+      transition: background 0.15s ease, transform 0.15s ease;
     }
     #tos-decline-btn { background: #f3f4f6; color: #374151; }
     #tos-decline-btn:hover { background: #e5e7eb; }
-    #tos-accept-btn { background: #2563eb; color: #fff; }
-    #tos-accept-btn:hover { background: #1d4ed8; }
+    #tos-accept-btn { background: #111; color: #fff; }
+    #tos-accept-btn:hover { background: #1a1a1a; transform: scale(1.02); }
 
     /* ── Wordmark rabbit animation ─────────────────────────────────── */
     .rabbit-stage {
@@ -452,7 +543,7 @@
         </li>
         <li>
           <span class="tos-icon">📖</span>
-          <span><strong>Wikipedia content.</strong> Article searches and summaries are fetched directly from Wikipedia's servers by your browser, subject to <a href="https://www.wikimedia.org/wiki/Policy:Terms_of_Use" target="_blank" rel="noopener" style="color:#2563eb;">Wikipedia's terms of use</a>.</span>
+          <span><strong>Wikipedia content.</strong> Article searches and summaries are fetched directly from Wikipedia's servers by your browser, subject to <a href="https://www.wikimedia.org/wiki/Policy:Terms_of_Use" target="_blank" rel="noopener" style="color:#111;text-decoration:underline;">Wikipedia's terms of use</a>.</span>
         </li>
         <li>
           <span class="tos-icon">🤖</span>

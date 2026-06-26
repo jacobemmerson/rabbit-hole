@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% if article %}{{ article.title }} — {% endif %}Rabbit Hole</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- CSS extracted directly from the proxied Wikipedia page -->
   {{ wiki_css | safe }}
@@ -17,49 +20,47 @@
       position: sticky;
       top: 0;
       z-index: 100;
-      background: #f8f9fa;
-      border-bottom: 1px solid #a2a9b1;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(0,0,0,.08);
       padding: .5rem 1.25rem;
       display: flex;
       align-items: center;
       gap: .75rem;
       flex-wrap: wrap;
+      font-family: 'Inter', system-ui, sans-serif;
     }
     #article-header .back-link {
-      color: #3366cc;
+      color: #6B7280;
       text-decoration: none;
       font-size: .875rem;
-      font-family: system-ui, sans-serif;
+      font-weight: 500;
       flex-shrink: 0;
     }
-    #article-header .back-link:hover { text-decoration: underline; }
+    #article-header .back-link:hover { color: #374151; }
     #article-header .article-title {
       font-size: .875rem;
-      color: #54595d;
-      font-family: system-ui, sans-serif;
+      color: #111827;
+      font-weight: 500;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
       flex: 1;
       min-width: 0;
     }
-    #stars {
-      display: flex;
-      gap: .25rem;
-      font-size: 1.4rem;
-      cursor: pointer;
-      user-select: none;
-      flex-shrink: 0;
-    }
     #article-header .wp-link {
-      color: #3366cc;
+      background: #F3F2EE;
+      border-radius: 6px;
+      padding: .25rem .65rem;
+      font-size: .75rem;
+      color: #6B7280;
       text-decoration: none;
-      font-size: .8rem;
-      font-family: system-ui, sans-serif;
       flex-shrink: 0;
       white-space: nowrap;
+      transition: color .15s;
     }
-    #article-header .wp-link:hover { text-decoration: underline; }
+    #article-header .wp-link:hover { color: #374151; }
 
     /* ── Rating pill (appears at 33 % scroll, minimizable) ── */
     #thumbs-widget {
@@ -71,10 +72,12 @@
       align-items: center;
       gap: .6rem;
       background: rgba(255,255,255,0.97);
-      border: 1.5px solid #e5e7eb;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(0,0,0,.08);
       border-radius: 100px;
       padding: .6rem 1rem .6rem 1.4rem;
-      box-shadow: 0 4px 24px rgba(0,0,0,.12);
+      box-shadow: 0 8px 32px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.06);
       opacity: 0;
       pointer-events: none;
       overflow: hidden;
@@ -82,6 +85,7 @@
       transition: opacity .35s ease, transform .35s ease,
                   bottom .3s ease, padding .3s ease, gap .3s ease;
       z-index: 200;
+      font-family: 'Inter', system-ui, sans-serif;
     }
     #thumbs-widget.visible {
       opacity: 1;
@@ -114,7 +118,7 @@
       user-select: none;
       transition: opacity .15s, transform .15s;
     }
-    #thumbs-widget .thumb:hover { transform: scale(1.2); }
+    #thumbs-widget .thumb:hover { transform: scale(1.25); }
     .pill-indicator {
       font-size: 1.3rem;
       line-height: 1;
@@ -146,8 +150,8 @@
     .pill-toggle:hover { color: #374151; }
     #thumbs-widget.minimized .pill-toggle { transform: rotate(180deg); }
     @keyframes rh-pill-pulse {
-      0%, 100% { box-shadow: 0 4px 24px rgba(0,0,0,.12); }
-      50%       { box-shadow: 0 4px 32px rgba(37,99,235,.4); }
+      0%, 100% { box-shadow: 0 8px 32px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.06); }
+      50%       { box-shadow: 0 4px 32px rgba(37,99,235,.45); }
     }
     #thumbs-widget.pulse { animation: rh-pill-pulse .4s ease; }
 
@@ -155,7 +159,7 @@
     #article-content {
       max-width: 960px;
       margin: 1.5rem auto;
-      padding: 0 1.5rem 3rem;
+      padding: 2rem 2rem 6rem;
     }
 
     /* Ensure images stay within bounds and protocol-relative sources resolve */

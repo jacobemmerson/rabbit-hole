@@ -4,23 +4,32 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rabbit Hole</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background: #f9f9f7;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: #F8F7F4;
       color: #111;
       min-height: 100vh;
-      padding: 2rem 3rem 4rem;
     }
 
     /* ── Top bar ── */
     .top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 2rem;
+      padding: .85rem 3rem;
+      background: rgba(248, 247, 244, 0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(0, 0, 0, .06);
     }
 
     .wordmark {
@@ -30,25 +39,9 @@
       text-transform: uppercase;
       color: #9ca3af;
       text-decoration: none;
-    }
-
-    #refresh-btn {
       display: inline-flex;
       align-items: center;
-      gap: .3rem;
-      padding: .35rem .85rem;
-      border: 1.5px solid #e5e7eb;
-      border-radius: 100px;
-      background: #fff;
-      font-size: .8rem;
-      color: #6b7280;
-      cursor: pointer;
-      transition: border-color .12s, color .12s;
-      font-family: inherit;
     }
-
-    #refresh-btn:hover { border-color: #93c5fd; color: #2563eb; }
-    #refresh-btn:disabled { opacity: .5; cursor: default; }
 
     .top-bar-actions {
       display: flex;
@@ -70,11 +63,37 @@
     #dev-mode-btn:hover, #clear-data-btn:hover { color: #9ca3af; }
     #dev-mode-btn.active { color: #6366f1; font-weight: 600; }
 
+    #refresh-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      padding: .4rem 1rem;
+      border: none;
+      border-radius: 100px;
+      background: #fff;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .1);
+      font-size: .82rem;
+      font-weight: 500;
+      color: #4B5563;
+      cursor: pointer;
+      transition: box-shadow .18s, color .12s, transform .18s;
+      font-family: inherit;
+    }
+    #refresh-btn:hover {
+      box-shadow: 0 3px 8px rgba(0, 0, 0, .1), 0 10px 24px rgba(0, 0, 0, .08);
+      color: #2563eb;
+      transform: translateY(-1px);
+    }
+    #refresh-btn:disabled { opacity: .5; cursor: default; transform: none; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+
+    /* ── Clear modal ── */
     .clear-modal-overlay {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.45);
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       align-items: center;
       justify-content: center;
       z-index: 200;
@@ -84,16 +103,16 @@
 
     .clear-modal-card {
       background: #fff;
-      border-radius: 16px;
-      padding: 1.75rem 2rem;
+      border-radius: 20px;
+      padding: 2rem 2.25rem;
       width: 100%;
-      max-width: 400px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-      font-family: system-ui, sans-serif;
+      max-width: 420px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, .22), 0 8px 24px rgba(0, 0, 0, .12);
+      font-family: 'Inter', system-ui, sans-serif;
     }
 
     .clear-modal-card h2 {
-      font-size: 1.05rem;
+      font-size: 1.1rem;
       font-weight: 700;
       color: #111;
       margin-bottom: .75rem;
@@ -102,7 +121,7 @@
     .clear-modal-card p {
       font-size: .875rem;
       color: #6b7280;
-      line-height: 1.55;
+      line-height: 1.6;
       margin-bottom: 1.25rem;
     }
 
@@ -110,10 +129,10 @@
       font-size: .8rem;
       color: #374151;
       background: #f3f4f6;
-      border-radius: 8px;
-      padding: .65rem .85rem;
+      border-radius: 10px;
+      padding: .7rem .9rem;
       margin-bottom: 1.5rem;
-      line-height: 1.5;
+      line-height: 1.55;
     }
 
     .clear-modal-actions {
@@ -123,8 +142,8 @@
     }
 
     .clear-modal-actions button {
-      padding: .55rem 1.1rem;
-      border-radius: 8px;
+      padding: .6rem 1.2rem;
+      border-radius: 10px;
       font-size: .875rem;
       font-weight: 600;
       cursor: pointer;
@@ -133,18 +152,17 @@
       transition: background .12s, opacity .12s;
     }
 
-    #clear-cancel-btn {
-      background: #f3f4f6;
-      color: #374151;
-    }
+    #clear-cancel-btn { background: #f3f4f6; color: #374151; }
     #clear-cancel-btn:hover { background: #e5e7eb; }
 
-    #clear-confirm-btn {
-      background: #dc2626;
-      color: #fff;
-    }
+    #clear-confirm-btn { background: #dc2626; color: #fff; }
     #clear-confirm-btn:hover { background: #b91c1c; }
     #clear-confirm-btn:disabled { opacity: .5; cursor: default; }
+
+    /* ── Page content wrapper ── */
+    .page-content {
+      padding: 2rem 3rem 4rem;
+    }
 
     /* ── Two-column layout ── */
     .layout {
@@ -154,56 +172,145 @@
       align-items: start;
     }
 
-    /* ── Main feed column ── */
+    /* ── History sidebar ── */
+    .sidebar {
+      position: sticky;
+      top: 72px;
+      max-height: calc(100vh - 88px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-panel {
+      background: #EFEDE9;
+      border-radius: 16px;
+      padding: 1rem 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .sidebar-label {
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #9ca3af;
+      margin-bottom: .75rem;
+      flex-shrink: 0;
+    }
+
+    .sidebar-scroll {
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+      scrollbar-width: thin;
+      scrollbar-color: #d5d2cc transparent;
+    }
+    .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+    .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-scroll::-webkit-scrollbar-thumb { background: #d5d2cc; border-radius: 2px; }
+
+    /* Each history group */
+    .sidebar-group { margin-bottom: .2rem; }
+
+    .sidebar-primary {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .4rem .55rem;
+      border-radius: 8px;
+      text-decoration: none;
+      color: #4B5563;
+      font-size: .8rem;
+      font-weight: 500;
+      transition: background .12s, color .12s;
+      line-height: 1.3;
+    }
+    .sidebar-primary:hover { background: rgba(0, 0, 0, .04); color: #111; }
+    .sidebar-primary .rating { font-size: .75rem; flex-shrink: 0; opacity: .8; }
+
+    .sidebar-children {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows .25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .sidebar-children-inner { overflow: hidden; }
+    .sidebar-group:hover .sidebar-children { grid-template-rows: 1fr; }
+
+    .sidebar-child {
+      display: flex;
+      align-items: center;
+      gap: .35rem;
+      padding: .28rem .55rem .28rem 1.35rem;
+      border-radius: 6px;
+      text-decoration: none;
+      color: #9ca3af;
+      font-size: .76rem;
+      transition: background .12s, color .12s;
+      line-height: 1.3;
+    }
+    .sidebar-child:hover { background: rgba(0, 0, 0, .04); color: #111; }
+    .sidebar-child .indent { color: #c4bfb8; flex-shrink: 0; font-size: .7rem; }
+    .sidebar-child .child-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .sidebar-empty { font-size: .78rem; color: #b5b0a9; padding: .4rem .55rem; }
+
+    /* ── Feed column ── */
     .feed-col {}
 
+    /* ── Section heading ── */
     .section-heading {
       display: flex;
       align-items: baseline;
-      gap: .6rem;
-      margin-bottom: 1rem;
+      gap: .65rem;
+      margin-bottom: 1.1rem;
     }
 
     .section-heading h1 {
-      font-size: 1.3rem;
+      font-size: 1.35rem;
       font-weight: 700;
+      color: #111;
     }
 
-    .new-day-badge {
+    .today-label {
       font-size: .7rem;
       font-weight: 600;
-      letter-spacing: .05em;
+      letter-spacing: .06em;
       text-transform: uppercase;
-      color: #2563eb;
-      background: #eff6ff;
-      border-radius: 100px;
-      padding: .15rem .55rem;
+      color: #b0a99f;
     }
 
-    /* ── Tab navigation ── */
+    /* ── Pill tab navigation ── */
     .tab-nav {
-      display: flex;
-      gap: .5rem;
+      display: inline-flex;
+      background: #EDECE8;
+      border-radius: 100px;
+      padding: 3px;
+      gap: 2px;
       margin-bottom: 1.25rem;
-      border-bottom: 1.5px solid #e5e7eb;
     }
 
     .tab-btn {
       background: transparent;
       border: none;
-      border-bottom: 2.5px solid transparent;
-      margin-bottom: -1.5px;   /* sit the active underline on top of the nav border */
-      font-size: 1rem;
-      font-weight: 600;
-      color: #9ca3af;
+      font-size: .875rem;
+      font-weight: 500;
+      color: #6b7280;
       cursor: pointer;
-      padding: .45rem 1rem;
+      padding: .35rem .9rem;
+      border-radius: 100px;
       font-family: inherit;
-      transition: color .2s, border-color .2s;
+      transition: background .2s, color .2s, box-shadow .2s;
     }
-
     .tab-btn:hover { color: #374151; }
-    .tab-btn.active { color: #111; border-bottom-color: #2563eb; }
+    .tab-btn.active {
+      background: #fff;
+      color: #111;
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, .1);
+    }
 
     /* ── Panel scroll container ── */
     .panel-container {
@@ -221,12 +328,17 @@
       flex-shrink: 0;
     }
 
+    /* ── Entrance animation ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
     /* ── Article grids ── */
     .article-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      grid-auto-rows: 8rem;   /* every card the same height regardless of text length */
-      gap: .6rem;
+      gap: .75rem;
     }
 
     .grid-message {
@@ -239,26 +351,36 @@
     .article-card {
       display: block;
       background: #fff;
-      border: 1.5px solid #e5e7eb;
-      border-radius: 12px;
-      padding: 1rem 1.1rem;
+      border: none;
+      border-radius: 16px;
+      padding: 1.1rem 1.2rem;
       text-decoration: none;
       color: inherit;
-      overflow: hidden;        /* clip content at the fixed row height */
-      transition: border-color .12s, box-shadow .12s;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, .06), 0 4px 12px rgba(0, 0, 0, .04);
+      transition: box-shadow .2s, transform .2s;
+      animation: fadeUp 0.3s ease both;
+    }
+    .article-card:hover {
+      box-shadow: 0 4px 8px rgba(0, 0, 0, .08), 0 12px 28px rgba(0, 0, 0, .08);
+      transform: translateY(-2px);
     }
 
-    .article-card:hover {
-      border-color: #93c5fd;
-      box-shadow: 0 2px 8px rgba(37,99,235,.08);
-    }
+    /* Staggered animation delays — up to 8 cards */
+    .article-card:nth-child(1) { animation-delay:   0ms; }
+    .article-card:nth-child(2) { animation-delay:  40ms; }
+    .article-card:nth-child(3) { animation-delay:  80ms; }
+    .article-card:nth-child(4) { animation-delay: 120ms; }
+    .article-card:nth-child(5) { animation-delay: 160ms; }
+    .article-card:nth-child(6) { animation-delay: 200ms; }
+    .article-card:nth-child(7) { animation-delay: 240ms; }
+    .article-card:nth-child(8) { animation-delay: 280ms; }
 
     .article-card h2 {
       font-size: .95rem;
       font-weight: 600;
       color: #111;
-      margin-bottom: .3rem;
-      line-height: 1.3;
+      margin-bottom: .35rem;
+      line-height: 1.35;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
@@ -266,114 +388,27 @@
     }
 
     .article-card p {
-      font-size: .85rem;
+      font-size: .83rem;
       color: #6b7280;
-      line-height: 1.55;
+      line-height: 1.6;
       display: -webkit-box;
       -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
 
-    /* ── History sidebar ── */
-    .sidebar {
-      position: sticky;
-      top: 2rem;
-      max-height: calc(100vh - 4rem);
+    /* ── Refresh button wrapper ── */
+    .refresh-wrap {
       display: flex;
-      flex-direction: column;
+      justify-content: center;
+      margin-top: 1.25rem;
     }
 
-    .sidebar-label {
-      font-size: .7rem;
-      font-weight: 700;
-      letter-spacing: .1em;
-      text-transform: uppercase;
-      color: #c4c4c4;
-      margin-bottom: .75rem;
-      flex-shrink: 0;
-    }
-
-    .sidebar-scroll {
-      overflow-y: auto;
-      flex: 1;
-      scrollbar-width: thin;
-      scrollbar-color: #e5e7eb transparent;
-    }
-
-    .sidebar-scroll::-webkit-scrollbar { width: 4px; }
-    .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-    .sidebar-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 2px; }
-
-    /* Each history group */
-    .sidebar-group {
-      margin-bottom: .25rem;
-    }
-
-    /* Primary article row */
-    .sidebar-primary {
-      display: flex;
-      align-items: center;
-      gap: .4rem;
-      padding: .45rem .6rem;
-      border-radius: 8px;
-      text-decoration: none;
-      color: #374151;
-      font-size: .82rem;
-      font-weight: 500;
-      transition: background .1s;
-      line-height: 1.3;
-    }
-
-    .sidebar-primary:hover { background: #fff; color: #2563eb; }
-
-    .sidebar-primary .rating { font-size: .75rem; flex-shrink: 0; opacity: .7; }
-
-    /* Children — hidden by default, expand on hover.
-       grid-template-rows animates to actual content height (smoother than max-height). */
-    .sidebar-children {
-      display: grid;
-      grid-template-rows: 0fr;
-      transition: grid-template-rows .25s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .sidebar-children-inner { overflow: hidden; }
-
-    .sidebar-group:hover .sidebar-children {
-      grid-template-rows: 1fr;
-    }
-
-    .sidebar-child {
-      display: flex;
-      align-items: center;
-      gap: .35rem;
-      padding: .3rem .6rem .3rem 1.4rem;
-      border-radius: 6px;
-      text-decoration: none;
-      color: #9ca3af;
-      font-size: .78rem;
-      transition: background .1s, color .1s;
-      line-height: 1.3;
-    }
-
-    .sidebar-child:hover { background: #fff; color: #2563eb; }
-
-    .sidebar-child .indent { color: #d1d5db; flex-shrink: 0; font-size: .7rem; }
-    .sidebar-child .child-title {
-      flex: 1; min-width: 0;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-
-    /* Empty state */
-    .sidebar-empty {
-      font-size: .8rem;
-      color: #d1d5db;
-      padding: .4rem .6rem;
-    }
-
-    /* ── Narrow screens: collapse to single column, sidebar below feed ── */
+    /* ── Narrow screens ── */
     @media (max-width: 768px) {
-      body { padding: 1.5rem 1.25rem 3rem; }
+      .top-bar { padding: .85rem 1.25rem; }
+
+      .page-content { padding: 1.5rem 1.25rem 3rem; }
 
       .layout { grid-template-columns: 1fr; }
 
@@ -381,10 +416,8 @@
 
       .sidebar {
         position: static;
+        top: auto;
         max-height: none;
-        border-top: 1px solid #e5e7eb;
-        padding-top: 1.5rem;
-        margin-top: 1rem;
       }
 
       .sidebar-scroll { max-height: 300px; }
@@ -446,13 +479,13 @@
 </head>
 <body>
 
-<div class="top-bar">
+<header class="top-bar">
   <a href="/" class="wordmark">Rabbit Hole<span class="rabbit-stage" aria-hidden="true"><span class="rabbit-mover"><span class="rabbit-disp"><img class="rabbit-gif rabbit-gif-idle" src="/media/idle.gif" alt=""><img class="rabbit-gif rabbit-gif-hop" src="/media/hopping.gif" alt=""></span></span></span></a>
   <div class="top-bar-actions">
     <button id="dev-mode-btn" title="Toggle dev panel">Dev</button>
     <button id="clear-data-btn" title="Clear all data">Clear data</button>
   </div>
-</div>
+</header>
 
 <!-- Clear data confirmation modal -->
 <div class="clear-modal-overlay" id="clear-modal">
@@ -469,82 +502,92 @@
   </div>
 </div>
 
-<div class="layout">
+<div class="page-content">
+  <div class="layout">
 
-  <!-- History sidebar (left) -->
-  <aside class="sidebar">
-    <div class="sidebar-label">Reading history</div>
-    <div class="sidebar-scroll">
-      {% if history_groups %}
-        {% for group in history_groups %}
-        <div class="sidebar-group">
-          <a href="/article/{{ group.entry.title }}" class="sidebar-primary">
-            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-              {{ group.entry.title }}
-            </span>
-            <span class="rating">
-              {% if group.entry.rating and group.entry.rating >= 4 %}👍
-              {% elif group.entry.rating and group.entry.rating <= 2 %}👎
-              {% endif %}
-            </span>
-          </a>
-          {% if group.children %}
-          <div class="sidebar-children">
-            <div class="sidebar-children-inner">
-              {% for child in group.children %}
-              <a href="/article/{{ child.title }}" class="sidebar-child">
-                <span class="indent">↳</span>
-                <span class="child-title">{{ child.title }}</span>
-                <span class="rating" style="font-size:.75rem;opacity:.7;flex-shrink:0;">
-                  {% if child.rating and child.rating >= 4 %}👍
-                  {% elif child.rating and child.rating <= 2 %}👎
+    <!-- History sidebar (left) -->
+    <aside class="sidebar">
+      <div class="sidebar-panel">
+        <div class="sidebar-label">Reading history</div>
+        <div class="sidebar-scroll">
+          {% if history_groups %}
+            {% for group in history_groups %}
+            <div class="sidebar-group">
+              <a href="/article/{{ group.entry.title }}" class="sidebar-primary">
+                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                  {{ group.entry.title }}
+                </span>
+                <span class="rating">
+                  {% if group.entry.rating and group.entry.rating >= 4 %}👍
+                  {% elif group.entry.rating and group.entry.rating <= 2 %}👎
                   {% endif %}
                 </span>
               </a>
-              {% endfor %}
+              {% if group.children %}
+              <div class="sidebar-children">
+                <div class="sidebar-children-inner">
+                  {% for child in group.children %}
+                  <a href="/article/{{ child.title }}" class="sidebar-child">
+                    <span class="indent">↳</span>
+                    <span class="child-title">{{ child.title }}</span>
+                    <span class="rating" style="font-size:.75rem;opacity:.7;flex-shrink:0;">
+                      {% if child.rating and child.rating >= 4 %}👍
+                      {% elif child.rating and child.rating <= 2 %}👎
+                      {% endif %}
+                    </span>
+                  </a>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
             </div>
-          </div>
+            {% endfor %}
+          {% else %}
+            <p class="sidebar-empty">Articles you read will appear here.</p>
           {% endif %}
         </div>
-        {% endfor %}
-      {% else %}
-        <p class="sidebar-empty">Articles you read will appear here.</p>
-      {% endif %}
-    </div>
-  </aside>
+      </div>
+    </aside>
 
-  <!-- Feed column (right) -->
-  <div class="feed-col">
+    <!-- Feed column (right) -->
+    <div class="feed-col">
 
-    <!-- Tab navigation -->
-    <div class="tab-nav">
-      <button class="tab-btn active" id="tab-btn-for-you">For You</button>
-      <button class="tab-btn" id="tab-btn-top-daily">Top Daily</button>
-    </div>
-
-    <div class="panel-container" id="panel-container">
-
-      <!-- For You panel — articles populated by feed.js via IndexedDB -->
-      <div class="panel" id="panel-for-you" style="scroll-snap-align:start;">
-        <div id="feed" class="article-grid">
-          <p class="grid-message" id="feed-loading">Loading…</p>
-        </div>
-        <div style="display:flex;justify-content:center;margin-top:1rem;">
-          <button id="refresh-btn">↺ Refresh</button>
-        </div>
+      <!-- Section heading with today label -->
+      <div class="section-heading">
+        <h1>Your feed</h1>
+        <span class="today-label">Today</span>
       </div>
 
-      <!-- Top Daily panel (lazy-loaded on first visit) -->
-      <div class="panel" id="panel-top-daily" style="scroll-snap-align:start;">
-        <div id="feed-top-daily" class="article-grid">
-          <p class="grid-message">Loading…</p>
+      <!-- Pill tab navigation -->
+      <div class="tab-nav">
+        <button class="tab-btn active" id="tab-btn-for-you">For You</button>
+        <button class="tab-btn" id="tab-btn-top-daily">Top Daily</button>
+      </div>
+
+      <div class="panel-container" id="panel-container">
+
+        <!-- For You panel — articles populated by feed.js via IndexedDB -->
+        <div class="panel" id="panel-for-you" style="scroll-snap-align:start;">
+          <div id="feed" class="article-grid">
+            <p class="grid-message">Loading…</p>
+          </div>
+          <div class="refresh-wrap">
+            <button id="refresh-btn">↺ Refresh</button>
+          </div>
         </div>
+
+        <!-- Top Daily panel (lazy-loaded on first visit) -->
+        <div class="panel" id="panel-top-daily" style="scroll-snap-align:start;">
+          <div id="feed-top-daily" class="article-grid">
+            <p class="grid-message">Loading…</p>
+          </div>
+        </div>
+
       </div>
 
     </div>
 
   </div>
-
 </div>
 
 <!-- Server injects profile so JS can seed IndexedDB without reading the httpOnly cookie -->
