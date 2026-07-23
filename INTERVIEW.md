@@ -54,10 +54,11 @@ The key visual takeaway: **the browser orchestrates and does all Wikipedia I/O; 
 scores.** State is split across three homes.
 
 ```mermaid
+%%{init: {'flowchart': {'padding': 22, 'nodeSpacing': 55, 'rankSpacing': 70}, 'themeVariables': {'fontSize': '15px'}}}%%
 flowchart TB
     subgraph Browser["User's Browser (orchestrator)"]
         JS["main.js / feed.js<br/>feed orchestration"]
-        IDB[("IndexedDB<br/>full profile · summary/candidate caches<br/>bandit state · per-article &phi;")]
+        IDB[("IndexedDB<br/>full profile · summary/candidate caches<br/>bandit state · per-article φ")]
         JS <--> IDB
     end
 
@@ -79,7 +80,7 @@ flowchart TB
 
     JS -->|"1. searches + summaries<br/>(from client's own network)"| Action
     JS -->|"2. POST /api/score<br/>candidates + history extracts"| Routes
-    Routes -->|"ranked titles + &phi;_map + &theta;"| JS
+    Routes -->|"ranked titles + φ_map + θ"| JS
     Cookie -.->|"__RH_INIT__ inline handoff on GET /"| JS
     MemCache -.->|"warm at startup · 12h refresh"| Pageviews
     Browser -->|"GET /article/{title}"| Routes
@@ -104,9 +105,9 @@ sequenceDiagram
     U->>W: bulkSummaries() — extracts in batches
     W-->>U: extracts (cached 6h in IDB)
     U->>S: POST /api/score (candidates + history extracts + bandit_state)
-    Note over S: embed → taste vectors (k-means)<br/>→ build &phi; → &theta;·&phi; rank<br/>→ TF-IDF learned queries
-    S-->>U: titles + &phi;_map + bandit_state + seed_queries
-    U->>DB: store current_articles, &phi;_map, &theta;, learned queries
+    Note over S: embed → taste vectors (k-means)<br/>→ build φ → θ·φ rank<br/>→ TF-IDF learned queries
+    S-->>U: titles + φ_map + bandit_state + seed_queries
+    U->>DB: store current_articles, φ_map, θ, learned queries
     U->>U: renderCards()
 ```
 
