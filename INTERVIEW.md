@@ -48,6 +48,68 @@ migrations, no backups, no connection pool, no persistence layer to operate. The
 server is *stateless per user* — it can't run a batch recommendation job overnight, and it must
 receive the reading history on each scoring call. That trade is deliberate.
 
+### System diagram
+
+The key visual takeaway: **the browser orchestrates and does all Wikipedia I/O; the server only
+scores.** State is split across three homes.
+
+```mermaid
+flowchart TB
+    subgraph Browser["User's Browser (orchestrator)"]
+        JS["main.js / feed.js<br/>feed orchestration"]
+        IDB[("IndexedDB<br/>full profile · summary/candidate caches<br/>bandit state · per-article &phi;")]
+        JS <--> IDB
+    end
+
+    subgraph Server["FastAPI Server (single process, stateless per user)"]
+        Routes["Routes<br/>/api/seed-queries · /api/score<br/>/api/bandit/update · /article/{title}"]
+        Model["all-MiniLM-L6-v2<br/>embedding model + bandit scoring"]
+        MemCache[("In-memory caches<br/>popularity · candidate search")]
+        Cookie{{"Signed httpOnly cookie<br/>timezone · categories<br/>custom_interests · reading_history"}}
+        Routes --> Model
+        Routes --> MemCache
+        Routes <--> Cookie
+    end
+
+    subgraph Wiki["Wikipedia / Wikimedia APIs"]
+        Action["Action API<br/>search + bulk extracts"]
+        Pageviews["Pageviews API<br/>daily popularity"]
+        ArticleHTML["Article HTML"]
+    end
+
+    JS -->|"1. searches + summaries<br/>(from client's own network)"| Action
+    JS -->|"2. POST /api/score<br/>candidates + history extracts"| Routes
+    Routes -->|"ranked titles + &phi;_map + &theta;"| JS
+    Cookie -.->|"__RH_INIT__ inline handoff on GET /"| JS
+    MemCache -.->|"warm at startup · 12h refresh"| Pageviews
+    Browser -->|"GET /article/{title}"| Routes
+    Routes -->|"proxied HTML, scripts stripped,<br/>rating pill injected"| ArticleHTML
+```
+
+### Feed-generation sequence
+
+```mermaid
+sequenceDiagram
+    participant U as Browser (feed.js)
+    participant DB as IndexedDB
+    participant S as Server
+    participant W as Wikipedia
+
+    U->>DB: read profile
+    Note over U: needsReset()? compare<br/>local date vs last_generated
+    U->>S: GET /api/seed-queries (categories, custom, history_len)
+    S-->>U: today's queries per group (no Wiki I/O)
+    U->>W: parallel searches (seed + history + learned bigrams)
+    W-->>U: candidate titles
+    U->>W: bulkSummaries() — extracts in batches
+    W-->>U: extracts (cached 6h in IDB)
+    U->>S: POST /api/score (candidates + history extracts + bandit_state)
+    Note over S: embed → taste vectors (k-means)<br/>→ build &phi; → &theta;·&phi; rank<br/>→ TF-IDF learned queries
+    S-->>U: titles + &phi;_map + bandit_state + seed_queries
+    U->>DB: store current_articles, &phi;_map, &theta;, learned queries
+    U->>U: renderCards()
+```
+
 ---
 
 ## 3. Request / data flow
