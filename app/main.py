@@ -4,11 +4,25 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import Response
 
 import app.services.embeddings as emb
 import app.services.wikipedia as wiki
 from app.config import settings
 from app.routes import api, pages
+
+
+class NoCacheStaticFiles(StaticFiles):
+    """Serve static assets with `Cache-Control: no-cache` so browsers always
+    revalidate before use. StaticFiles still returns 304 when a file is
+    unchanged, so this stays cheap — but a changed JS/CSS file is picked up
+    immediately, preventing stale scripts from running against fresh markup.
+    """
+
+    def file_response(self, *args, **kwargs) -> Response:
+        resp = super().file_response(*args, **kwargs)
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
 
 
 async def _daily_popularity_refresh() -> None:
@@ -43,8 +57,8 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     application = FastAPI(title="Rabbit Hole", lifespan=lifespan, debug=settings.debug)
-    application.mount("/static", StaticFiles(directory="app/static"), name="static")
-    application.mount("/media",  StaticFiles(directory="app/media"),  name="media")
+    application.mount("/static", NoCacheStaticFiles(directory="app/static"), name="static")
+    application.mount("/media",  NoCacheStaticFiles(directory="app/media"),  name="media")
     application.include_router(pages.router)
     application.include_router(api.router)
     return application
