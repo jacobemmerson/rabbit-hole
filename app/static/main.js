@@ -176,6 +176,31 @@ if (feedEl) {
     });
   }
 
+  // ── History drawer ──────────────────────────────────────────────────────────
+  const historyDrawer  = document.getElementById('history-drawer');
+  const historyOverlay = document.getElementById('history-overlay');
+  const historyBtn     = document.getElementById('history-btn');
+  const historyClose   = document.getElementById('history-close');
+
+  if (historyDrawer && historyBtn) {
+    const openDrawer  = () => {
+      historyDrawer.classList.add('open');
+      historyOverlay.classList.add('open');
+      historyDrawer.setAttribute('aria-hidden', 'false');
+    };
+    const closeDrawer = () => {
+      historyDrawer.classList.remove('open');
+      historyOverlay.classList.remove('open');
+      historyDrawer.setAttribute('aria-hidden', 'true');
+    };
+    historyBtn.addEventListener('click', openDrawer);
+    historyClose?.addEventListener('click', closeDrawer);
+    historyOverlay.addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && historyDrawer.classList.contains('open')) closeDrawer();
+    });
+  }
+
   // ── Clear data modal ────────────────────────────────────────────────────────
   const clearModal     = document.getElementById('clear-modal');
   const clearOpenBtn   = document.getElementById('clear-data-btn');

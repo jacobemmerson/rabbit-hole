@@ -1,8 +1,8 @@
 import { getProfile, patchProfile, bulkGetSummaries, getBanditState, setBanditState, setPhiMap, getLearnedQueries, setLearnedQueries } from './db.js';
-import { search, bulkSummaries } from './wikipedia.js';
+import { search, bulkSummaries, fillMissingImages } from './wikipedia.js';
 
-const FEED_SIZE     = 8;
-const MAX_CANDIDATES = 30;
+const FEED_SIZE     = 12;
+const MAX_CANDIDATES = 36;
 const META_PREFIXES  = ['Outline of ', 'List of ', 'Index of ', 'Lists of ', 'Glossary of '];
 
 // ── Date helpers (replaces server-side reset.py) ──────────────────────────────
@@ -24,9 +24,15 @@ export function needsReset(profile) {
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
 export function makeCard(a) {
+  const img = a.thumbnailUrl
+    ? `<div class="card-img" style="--bg:url('${a.thumbnailUrl.replace(/'/g, '%27')}')"><img src="${a.thumbnailUrl}" alt="" loading="lazy"></div>`
+    : `<div class="card-img card-img-empty" aria-hidden="true">${(a.title[0] ?? '·').toUpperCase()}</div>`;
   return `<a href="/article/${encodeURIComponent(a.title)}" class="article-card">` +
+         img +
+         `<div class="card-body">` +
          `<h2>${a.title}</h2>` +
-         `<p>${a.extract.slice(0, 200)}${a.extract.length > 200 ? '…' : ''}</p>` +
+         `<p>${a.extract.slice(0, 160)}${a.extract.length > 160 ? '…' : ''}</p>` +
+         `</div>` +
          `</a>`;
 }
 
@@ -166,9 +172,11 @@ export async function generateFeed(db) {
 
   if (!rankedTitles.length) return;
 
-  // 8. Fetch final summaries (mostly cache hits) and render in server-ranked order.
-  // bulkSummaries does not preserve input order, so re-sort by rankedTitles.
+  // 8. Fetch final summaries (mostly cache hits), backfill any missing images,
+  // and render in server-ranked order. bulkSummaries does not preserve input
+  // order, so re-sort by rankedTitles.
   const finalSummaries = await bulkSummaries(rankedTitles, db);
+  await fillMissingImages(db, finalSummaries);
   const finalMap = new Map(finalSummaries.map(s => [s.title, s]));
   renderCards(rankedTitles.map(t => finalMap.get(t)).filter(Boolean));
 

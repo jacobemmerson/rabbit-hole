@@ -50,7 +50,9 @@ export async function bulkSummaries(titles, db) {
       titles: batch.join('|'),
       prop: 'extracts|pageimages|pageprops|info',
       exintro: '1', explaintext: '1', exlimit: 'max',
-      pithumbsize: '200', inprop: 'url', redirects: '1',
+      // pilicense=any includes non-free lead images (album/film/book covers,
+      // logos) that the default 'free' filter drops, leaving those cards blank.
+      pithumbsize: '400', pilicense: 'any', inprop: 'url', redirects: '1',
       format: 'json', origin: '*',
     });
 
@@ -115,6 +117,42 @@ export async function bulkSummaries(titles, db) {
   return results;
 }
 
+// ── Image fallback ──────────────────────────────────────────────────────────────
+
+// When pageimages returns no thumbnail even with pilicense=any (pages that have
+// images but no designated "page image"), fall back to the page's first gallery
+// image via the REST media-list endpoint.
+export async function firstPageImage(title) {
+  try {
+    const slug = encodeURIComponent(title.replace(/ /g, '_'));
+    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/media-list/${slug}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const images = (data.items ?? []).filter(i => i.type === 'image' && i.srcset?.length);
+    const lead = images.find(i => i.showInGallery) ?? images[0];
+    if (!lead) return null;
+    const src = lead.srcset[0].src;
+    return src.startsWith('//') ? `https:${src}` : src;
+  } catch {
+    return null;
+  }
+}
+
+// Fill in thumbnails for any summaries still missing one, then persist the
+// backfilled images to the cache so the fallback runs at most once per article.
+// Mutates the passed summary objects in place and returns them.
+export async function fillMissingImages(db, summaries) {
+  const missing = summaries.filter(s => s && !s.thumbnailUrl);
+  if (!missing.length) return summaries;
+  await Promise.all(missing.map(async (s) => {
+    const url = await firstPageImage(s.title);
+    if (url) s.thumbnailUrl = url;
+  }));
+  const fixed = missing.filter(s => s.thumbnailUrl);
+  if (fixed.length) await bulkSetSummaries(db, fixed);
+  return summaries;
+}
+
 // ── Top Daily ─────────────────────────────────────────────────────────────────
 
 // Normalise a title for fuzzy matching — mirrors the server-side _norm() in api.py.
@@ -149,10 +187,12 @@ export async function topDailySummaries(db) {
     // Fallback: normalised match for minor formatting differences (dash variants, etc.).
     const summaryMap = new Map(summaries.map(s => [s.title, s]));
     const normMap    = new Map(summaries.map(s => [_norm(s.title), s]));
-    return candidates
+    const result = candidates
       .map(t => summaryMap.get(t) ?? normMap.get(_norm(t)))
       .filter(Boolean)
       .slice(0, 8);
+    await fillMissingImages(db, result);
+    return result;
   } catch {
     return [];
   }

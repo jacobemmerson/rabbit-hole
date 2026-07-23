@@ -1,0 +1,173 @@
+/* ==========================================================================
+   Rabbit Hole — article chrome
+   Scoped styles for the header, rating pill, and hint injected onto article
+   pages. Deliberately contains NO reset and NO `body` rule: this sheet is
+   linked into the proxied Wikipedia HTML, whose own layout must stay intact.
+   Only id-/class-scoped selectors and the tokens they need live here.
+   ========================================================================== */
+
+:root {
+  --surface:       #ffffff;
+  --text:          #111111;
+  --text-muted:    #6b7280;
+  --text-faint:    #9ca3af;
+  --border-strong: rgba(0, 0, 0, .08);
+  --accent:        #2563eb;
+  --radius:        16px;
+  --radius-pill:   100px;
+  --shadow-pill:   0 8px 32px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.06);
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+#rh-header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .5rem 1.25rem;
+  background: rgba(248, 247, 244, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border-strong);
+  font-family: var(--font);
+  font-size: .875rem;
+}
+#rh-header .back-link { color: var(--text-muted); text-decoration: none; font-weight: 500; flex-shrink: 0; }
+#rh-header .back-link:hover { color: #374151; }
+#rh-header .article-title {
+  color: var(--text);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+#rh-header .wp-link {
+  background: #F3F2EE;
+  border-radius: 6px;
+  padding: .25rem .65rem;
+  font-size: .75rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: color .15s;
+}
+#rh-header .wp-link:hover { color: #374151; }
+
+/* ── Rating pill ────────────────────────────────────────────────────────── */
+#thumbs-widget {
+  position: fixed;
+  bottom: 1.75rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(14px);
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  background: rgba(255,255,255,0.97);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  padding: .6rem 1rem .6rem 1.4rem;
+  box-shadow: var(--shadow-pill);
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+  cursor: default;
+  transition: opacity .35s ease, transform .35s ease,
+              bottom .3s ease, padding .3s ease, gap .3s ease;
+  z-index: 99998;
+  font-family: var(--font);
+}
+#thumbs-widget.visible { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+#thumbs-widget.minimized { bottom: .6rem; padding: .35rem .85rem .35rem .95rem; gap: .3rem; cursor: pointer; }
+.pill-rating {
+  display: flex;
+  gap: .75rem;
+  max-width: 5rem;
+  overflow: hidden;
+  transition: max-width .3s ease, opacity .2s ease;
+}
+#thumbs-widget.minimized .pill-rating { max-width: 0; opacity: 0; pointer-events: none; }
+#thumbs-widget .thumb {
+  font-size: 1.6rem;
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+  user-select: none;
+  transition: opacity .15s, transform .15s;
+}
+#thumbs-widget .thumb:hover { transform: scale(1.25); }
+.pill-indicator {
+  font-size: 1.3rem;
+  line-height: 1;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  flex-shrink: 0;
+  user-select: none;
+  white-space: nowrap;
+  transition: max-width .3s ease, opacity .2s ease .1s;
+}
+#thumbs-widget.minimized .pill-indicator { max-width: 2rem; opacity: 1; }
+.pill-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-faint);
+  padding: .1rem .15rem;
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+  border-radius: 4px;
+  font-family: inherit;
+  transition: color .15s, transform .3s ease;
+}
+.pill-toggle:hover { color: #374151; }
+#thumbs-widget.minimized .pill-toggle { transform: rotate(180deg); }
+@keyframes rh-pill-pulse {
+  0%, 100% { box-shadow: var(--shadow-pill); }
+  50%      { box-shadow: 0 4px 32px rgba(37,99,235,.45); }
+}
+#thumbs-widget.pulse { animation: rh-pill-pulse .4s ease; }
+
+/* ── One-time rating hint overlay ───────────────────────────────────────── */
+#rh-rating-hint {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  background: rgba(0,0,0,0.45);
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+#rh-rating-hint .hint-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 1.75rem 2rem;
+  max-width: 320px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  font-family: var(--font);
+  text-align: center;
+}
+#rh-rating-hint .hint-emoji { font-size: 2rem; margin-bottom: .75rem; letter-spacing: .15em; }
+#rh-rating-hint .hint-title { font-size: .95rem; font-weight: 600; color: var(--text); margin-bottom: .4rem; }
+#rh-rating-hint .hint-body  { font-size: .82rem; color: var(--text-muted); line-height: 1.55; margin-bottom: 1.25rem; }
+#rh-rating-hint .hint-dismiss {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: .55rem 1.25rem;
+  font-size: .875rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font);
+}
