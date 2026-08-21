@@ -12,7 +12,7 @@ const db = await openDB();
 if (typeof window.__RH_INIT__ !== 'undefined') {
   const existing = await getProfile(db);
   if (!existing) {
-    // First load after onboarding or on a new device — seed from server data.
+    // First load after onboarding or on a new device: seed from server data.
     await setProfile(db, {
       timezone:           window.__RH_INIT__.timezone           ?? 'UTC',
       last_generated:     null,
@@ -292,8 +292,8 @@ if (articleMeta) {
   let _updateSent        = false;
   const [_phi, _banditState] = await Promise.all([getPhi(db, canonical), getBanditState(db)]);
 
-  // High-water reward for this article across all visits.  Guards against
-  // repeated click-and-back inflating the bandit — we only send an update when
+  // High-water reward for this article across all visits. Guards against
+  // repeated click-and-back inflating the bandit: only send an update when
   // this visit produces a strictly stronger signal than any previous one.
   const _RW_KEY = 'rh_article_rewards';
   let _prevReward = -1;
@@ -336,7 +336,7 @@ if (articleMeta) {
     const _savedRating = parseInt(thumbsWidget.dataset.saved || '0');
     if (_savedRating && indicator) indicator.textContent = _savedRating === 5 ? '👍' : '👎';
 
-    // Show immediately — a rAF ensures the initial hidden state is painted first
+    // Show immediately. A rAF ensures the initial hidden state is painted first
     // so the slide-up transition actually plays.
     requestAnimationFrame(() => thumbsWidget.classList.add('visible'));
 
@@ -376,14 +376,14 @@ if (articleMeta) {
           body: JSON.stringify({ title: canonical, rating }),
         }).catch(err => console.error('Feedback failed:', err));
 
-        // Accumulate rating into pending reward — sent on exit.
+        // Accumulate rating into pending reward, sent on exit.
         _pendingReward     = rating === 5 ? 1.0 : 0.0;
         _hasExplicitRating = true;
       });
     });
   }
 
-  // ── Deferred bandit update — fires once when the user leaves the article ────
+  // ── Deferred bandit update: fires once when the user leaves the article ────
   window.addEventListener('pagehide', () => {
     if (!_phi || !_banditState || _updateSent) return;
     if (_pendingReward <= _prevReward) return;  // no stronger signal than a prior visit
@@ -395,8 +395,8 @@ if (articleMeta) {
       localStorage.setItem(_RW_KEY, JSON.stringify(_rw));
     } catch {}
     const payload = { phi: _phi, reward: _pendingReward, bandit_state: _banditState };
-    // localStorage.setItem is synchronous — it survives page unload reliably,
-    // unlike IDB writes.  The feed page picks this up on next load and applies
+    // localStorage.setItem is synchronous, so it survives page unload reliably,
+    // unlike IDB writes. The feed page picks this up on next load and applies
     // it before generating the feed so the updated θ is used immediately.
     try { localStorage.setItem('rh_pending_bandit', JSON.stringify(payload)); } catch {}
     // Also fire a keepalive fetch; if the response arrives before teardown,
@@ -446,9 +446,9 @@ if (articleMeta) {
           body: JSON.stringify({ title: canonical, depth: milestone }),
         }).catch(err => console.error('Scroll ping failed:', err));
 
-        // Accumulate scroll reward — takes effect only if no explicit rating given.
-        // Math.max keeps the 75 % peak (≈0.90) from being downgraded by the
-        // 100 % milestone (≈0.67) if the user keeps scrolling.
+        // Accumulate scroll reward, takes effect only if no explicit rating given.
+        // Math.max keeps the 75% peak (~0.90) from being downgraded by the
+        // 100% milestone (~0.67) if the user keeps scrolling.
         if (milestone >= 75 && !_hasExplicitRating) {
           _pendingReward = Math.max(_pendingReward, 0.65 + 0.25 * Math.exp(-0.1 * (milestone - 75)));
         }

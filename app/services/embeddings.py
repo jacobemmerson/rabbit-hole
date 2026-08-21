@@ -17,8 +17,8 @@ NEGATIVE_LAMBDA  = 0.3    # how far to push away from 1★ articles
 MIN_CLUSTER_SIZE = 5      # minimum articles per cluster before splitting
 MAX_CLUSTERS     = 5      # never exceed this many taste vectors
 
-# Thumbs up (5) → strong positive pull; thumbs down (1) → weak weight that
-# goes to the negative pool in compute_taste_vectors.  Unrated → neutral 1.0.
+# Thumbs up (5): strong positive pull. Thumbs down (1): weak weight that
+# goes to the negative pool in compute_taste_vectors. Unrated: neutral 1.0.
 _RATING_MAP = {5: 2.0, 1: 0.2}
 
 
@@ -61,15 +61,15 @@ def compute_taste_vectors(
 
     Three improvements over a plain weighted average:
 
-    1. Recency decay — articles read earlier in history get exponentially less
+    1. Recency decay: articles read earlier in history get exponentially less
        weight so the taste vector tracks current interests.
-    2. Negative signal — explicitly 1★ articles are embedded separately and
-       their centroid is subtracted from every cluster, pushing recommendations
+    2. Negative signal: 1-star articles are embedded separately and their
+       centroid is subtracted from every cluster, pushing recommendations
        away from disliked content.
-    3. Multi-vector — k-means clusters the positive embeddings so a user with
-       broad interests (e.g. physics AND cooking) gets one vector per topic
-       rather than a muddled midpoint.  Scoring takes the max cosine similarity
-       across all vectors, so a candidate only needs to match ONE cluster.
+    3. Multi-vector: k-means clusters the positive embeddings so a user with
+       broad interests (e.g. physics and cooking) gets one vector per topic
+       rather than a muddled midpoint. Scoring takes the max cosine similarity
+       across all vectors, so a candidate only needs to match one cluster.
     """
     extract_map = {s.title: s.extract for s in summaries if s.extract}
 
@@ -91,14 +91,14 @@ def compute_taste_vectors(
         recency = RECENCY_DECAY ** (n - 1 - i)
 
         if entry.rating == 1:
-            # Actively disliked — push the taste vector away from these
+            # Actively disliked, push the taste vector away from these
             neg_texts.append(extract)
             neg_weights.append(base)
         else:
             pos_texts.append(extract)
             pos_weights.append(base * recency)
 
-    # Custom interests are permanent anchors — no recency decay
+    # Custom interests are permanent anchors, no recency decay
     for text in profile.custom_interests:
         if text.strip():
             pos_texts.append(text.strip())
@@ -195,7 +195,7 @@ def score_candidates_multi(
     if not candidates or not taste_vectors:
         return [{} for _ in taste_vectors]
     texts = [c.extract for c in candidates]
-    embs  = embed(texts)                          # one call regardless of k
+    embs  = embed(texts)   # one call regardless of k
     return [
         {c.title: float(s) for c, s in zip(candidates, embs @ tv)}
         for tv in taste_vectors

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 _client: httpx.AsyncClient | None = None
 
-# Separate semaphores for the two Wikipedia APIs — they have independent rate limits.
+# Separate semaphores for the two Wikipedia APIs: they have independent rate limits.
 # REST API (summaries) is more lenient; action API (category/search) is stricter.
 _rest_sem: asyncio.Semaphore | None = None   # for /api/rest_v1/ calls
 _action_sem: asyncio.Semaphore | None = None  # for /w/api.php calls
@@ -109,7 +109,7 @@ async def fetch_summary(title: str) -> ArticleSummary | None:
 
 async def fetch_category_members(category_name: str, limit: int = 20) -> list[str]:
     """Return article titles that are members of the given Wikipedia category.
-    Results are cached for 24 hours — category membership rarely changes.
+    Results are cached for 24 hours since category membership rarely changes.
     """
     if not category_name.startswith("Category:"):
         category_name = f"Category:{category_name}"
@@ -172,7 +172,7 @@ async def fetch_search(query: str, limit: int = 10) -> list[str]:
 
 
 _HIDE_NAV_CSS = """<style id="rh-chrome">
-/* Hide Wikipedia navigation — keep only article content */
+/* Hide Wikipedia navigation, keep only article content */
 .vector-header,.mw-header,#mw-navigation,.vector-column-start,
 #mw-panel,.vector-sidebar-container,.vector-column-end,
 .vector-toc-landmark,.vector-page-toolbar,.vector-sticky-header,
@@ -193,12 +193,12 @@ body { padding-top:52px !important; }
 def _process_wiki_page(html: str, from_title: str) -> str:
     """Keep the full Wikipedia HTML document but rewrite links and make URLs absolute.
     The full document structure is preserved so all CSS selectors keep working.
-    Cached by title — does not contain user-specific data (stars rating).
+    Cached by title. Does not contain user-specific data (star rating).
     """
     import re
     from urllib.parse import quote
 
-    # Remove scripts — Wikipedia's JS tries to contact its own servers
+    # Remove scripts so Wikipedia's JS can't contact its own servers
     html = re.sub(r'<script\b[^>]*>.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
 
     # Rewrite /wiki/ article links to stay in the app
@@ -229,7 +229,7 @@ _THUMBS = [("👍", 5), ("👎", 1)]
 
 def inject_article_chrome(html: str, page_title: str, current_rating: int | None) -> str:
     """Inject our app header, rating pill, and main.js into the processed page.
-    Called at serve time — not cached — because it contains the user's rating.
+    Called at serve time, not cached, because it contains the user's rating.
     """
     page_url = f'https://en.wikipedia.org/wiki/{page_title.replace(" ", "_")}'
     header = (
@@ -261,7 +261,7 @@ def inject_article_chrome(html: str, page_title: str, current_rating: int | None
         '<div class="hint-emoji">👍 👎</div>'
         '<p class="hint-title">Rate what you read</p>'
         '<p class="hint-body">'
-        'Use the pill at the bottom to rate articles — your ratings help us find better recommendations.'
+        'Use the pill at the bottom to rate articles. Ratings improve future recommendations.'
         '</p>'
         '<button id="rh-hint-dismiss" class="hint-dismiss">Got it</button>'
         '</div></div>'
@@ -284,7 +284,7 @@ def inject_article_chrome(html: str, page_title: str, current_rating: int | None
 
 async def fetch_wiki_page(title: str) -> str | None:
     """Proxy the full Wikipedia article page (document structure intact, nav hidden via CSS).
-    Returns processed HTML without user-specific data — safe to cache by title.
+    Returns processed HTML without user-specific data, safe to cache by title.
     """
     cache_key = f"proxy:{title}"
     cached = _html_cache.get(cache_key)
@@ -313,7 +313,7 @@ async def fetch_wiki_page(title: str) -> str | None:
 def get_popularity() -> dict[str, int]:
     """Return the in-memory popularity cache synchronously.
     Populated at startup and refreshed daily by a background task.
-    Safe to call from any async context — no I/O.
+    Safe to call from any async context; does no I/O.
     """
     return _popularity_cache
 
@@ -417,9 +417,9 @@ async def fetch_top_articles(limit: int = 500) -> None:
 
         _popularity_cache = result
         _popularity_cached_at = datetime.now()
-        logger.info("Popularity cache updated: %d articles (rank 1: %s)", len(result), next(iter(result), "—"))
+        logger.info("Popularity cache updated: %d articles (rank 1: %s)", len(result), next(iter(result), "none"))
     except (httpx.HTTPError, httpx.TimeoutException, Exception) as e:
-        logger.warning("fetch_top_articles failed: %s — keeping stale cache (%d articles)", e, len(_popularity_cache))
+        logger.warning("fetch_top_articles failed: %s, keeping stale cache (%d articles)", e, len(_popularity_cache))
 
 
 async def fetch_summaries_bulk(titles: list[str]) -> list[ArticleSummary]:
@@ -444,15 +444,15 @@ async def fetch_summaries_bulk(titles: list[str]) -> list[ArticleSummary]:
             article, cached_at = cached
             if datetime.now() - cached_at < _SUMMARY_TTL:
                 if article is None or article.page_type == "disambiguation":
-                    continue  # genuinely missing/disambiguation — skip
+                    continue  # genuinely missing/disambiguation, skip
                 if article.extract:
                     results.append(article)
                     continue  # good cache hit with content
-                # empty extract within TTL — fall through to re-fetch so the
+                # empty extract within TTL, fall through to re-fetch so the
                 # two-stage fallback gets another chance to fill it in
         uncached.append(title)
 
-    # Batch uncached titles — action API allows up to 50 titles per request
+    # Batch uncached titles: action API allows up to 50 titles per request
     for i in range(0, len(uncached), 50):
         batch = uncached[i : i + 50]
         params = {
@@ -487,7 +487,7 @@ async def fetch_summaries_bulk(titles: list[str]) -> list[ArticleSummary]:
                     thumbnail_url=page.get("thumbnail", {}).get("source") if page.get("thumbnail") else None,
                     page_type=page_type,
                 )
-                # Only cache if the extract is non-empty — caching an empty
+                # Only cache if the extract is non-empty. Caching an empty
                 # extract here would poison the cache and prevent the fallback
                 # from ever running again for this article on subsequent calls.
                 if article.extract or page_type == "disambiguation":

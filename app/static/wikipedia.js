@@ -155,7 +155,7 @@ export async function fillMissingImages(db, summaries) {
 
 // ── Top Daily ─────────────────────────────────────────────────────────────────
 
-// Normalise a title for fuzzy matching — mirrors the server-side _norm() in api.py.
+// Normalise a title for fuzzy matching against dash/quote formatting differences.
 function _norm(t) {
   return t.toLowerCase()
     .replace(/[–—−]/g, '-')

@@ -9,9 +9,8 @@ class ReadingHistoryEntry(BaseModel):
 
 
 class UserProfile(BaseModel):
-    # Fields kept in the signed cookie — only what the server needs to trust.
-    # All other state (current_articles, seen_articles, shown_articles,
-    # last_generated) lives in the client's IndexedDB.
+    # Only what the server needs to trust, kept in the signed cookie.
+    # Everything else lives in the client's IndexedDB.
     timezone: str = "UTC"
     selected_categories: list[str] = []
     custom_interests: list[str] = []
@@ -45,7 +44,7 @@ class CandidateItem(BaseModel):
 
 
 class BanditStateModel(BaseModel):
-    """Pydantic wrapper for API serialisation of bandits.BanditState."""
+    """Pydantic wrapper for API serialization of bandits.BanditState."""
     theta:     list[float]
     A_flat:    list[float]
     b:         list[float]
@@ -65,7 +64,6 @@ class BanditUpdateRequest(BaseModel):
     bandit_state: BanditStateModel
 
 
-# FeedResponse kept for any callers that still reference it during migration
 class FeedResponse(BaseModel):
     articles: list[ArticleSummary]
     is_new_day: bool

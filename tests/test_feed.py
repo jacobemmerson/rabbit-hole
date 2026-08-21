@@ -8,7 +8,7 @@ def test_home_renders_shell(client, signed_cookie_for, empty_profile):
     client.cookies.set("session", signed_cookie_for(empty_profile))
     response = client.get("/")
     assert response.status_code == 200
-    # Feed grid is empty — articles are populated client-side via IndexedDB + feed.js
+    # Feed grid is empty; articles are populated client-side via IndexedDB + feed.js
     assert 'id="feed"' in response.text
     # Server injects profile init data for JS
     assert '__RH_INIT__' in response.text

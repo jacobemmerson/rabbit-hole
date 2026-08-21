@@ -118,12 +118,12 @@ async def seed_queries(
 ):
     """Return today's Wikipedia search queries per interest group.
 
-    Stateless — no cookie needed. The client uses these to make Wikipedia
+    Stateless, no cookie needed. The client uses these to make Wikipedia
     search calls from its own network, bypassing server-side rate limits.
 
     Queries taper as reading history grows so learned TF-IDF queries take over:
-      - Category queries:  2 per category (0–3 articles) → 1 (4–7) → 0 (8+)
-      - Custom queries:    1 per interest (0–9 articles) → 0 (10+)
+      - Category queries: 2 per category (0-3 articles), 1 (4-7), 0 (8+)
+      - Custom queries: 1 per interest (0-9 articles), 0 (10+)
     General category interests taper first; custom interests persist longer.
     """
     if history_len >= 8:
@@ -155,13 +155,13 @@ async def score(
     """Rank client-provided candidates using the embedding model + bandit.
 
     Returns:
-      titles       — ranked article titles
-      phi_map      — feature vector per candidate (store in IndexedDB for bandit updates)
-      bandit_state — current state (default warm-start if none was supplied)
-      seed_queries — TF-IDF bigrams from reading history, reranked by taste similarity,
+      titles       - ranked article titles
+      phi_map      - feature vector per candidate (store in IndexedDB for bandit updates)
+      bandit_state - current state (default warm-start if none was supplied)
+      seed_queries - TF-IDF bigrams from reading history, reranked by taste similarity,
                      for use as learned seed queries on the next feed generation
     """
-    # Compute taste vectors once — used by both the bandit scorer and query gen.
+    # Compute taste vectors once, shared by the bandit scorer and query gen.
     history_summaries = [
         ArticleSummary(title=e.title, extract=body.history_extracts[e.title], page_url="")
         for e in profile.reading_history
@@ -205,8 +205,8 @@ async def score(
 async def bandit_update(body: BanditUpdateRequest):
     """Incorporate one (φ, r) feedback observation into the bandit posterior.
 
-    Called by the client after a rating or meaningful scroll event.  Pure linear
-    algebra — no Wikipedia I/O, no cookie required.
+    Called by the client after a rating or meaningful scroll event. Pure linear
+    algebra, no Wikipedia I/O, no cookie required.
     """
     current = bandits.BanditState.from_dict(body.bandit_state.model_dump())
     updated = bandits.update(current, body.phi, body.reward)

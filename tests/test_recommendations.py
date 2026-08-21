@@ -22,7 +22,7 @@ def _make_mock_model(seed: int = 42) -> MagicMock:
     return model
 
 
-MOCK_RELATED = [f"Cand{i}" for i in range(1, 14)]  # 13 candidates — enough for 10-article feeds
+MOCK_RELATED = [f"Cand{i}" for i in range(1, 14)]  # 13 candidates, enough for 10-article feeds
 MOCK_SUMMARIES = [
     ArticleSummary(title=t, extract=f"Extract for {t}.", page_url="")
     for t in MOCK_RELATED + ["Quantum_mechanics", "Roman_Empire", "Photosynthesis"]
@@ -179,7 +179,7 @@ def test_alpha_below_1_before_10_articles():
 async def test_cold_start_custom_interests_not_crowded_out(mocker):
     # With 2 categories and 1 custom interest there are 3 groups in the round-robin.
     # The custom interest must claim at least one slot even when category buckets
-    # are full — previously custom filled only after categories were exhausted.
+    # are full; previously custom filled only after categories were exhausted.
     cat_titles = [f"CatArticle{i}" for i in range(20)]
     custom_titles = [f"CustomArticle{i}" for i in range(10)]
 

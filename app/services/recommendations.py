@@ -439,7 +439,7 @@ def score_candidates_for_profile(
         if taste_vectors is not None else []
     )
 
-    # Resolve bandit θ — fall back to default warm-start if no state supplied
+    # Resolve bandit θ, falling back to default warm-start if no state supplied
     bs = (
         bandits.BanditState.from_dict(bandit_state.model_dump())
         if bandit_state is not None

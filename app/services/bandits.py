@@ -1,6 +1,6 @@
 """Linear contextual bandit (LinTS-style) for personalised article scoring.
 
-Feature vector φ(context, article) — dimension 9:
+Feature vector φ(context, article), dimension 9:
   [sim_0, sim_1, sim_2, sim_3, sim_4,   ← cosine sims to taste vector clusters,
                                             sorted descending, zero-padded to 5
    pop_score,                            ← exp(-(rank-1)/150)
@@ -33,7 +33,7 @@ _THETA_WARM = [
     0.02,   # cluster sim 4
     0.24,   # pop_score
     0.38,   # cat_score
-    0.00,   # from_history  (no prior — learned from data)
+    0.00,   # from_history  (no prior, learned from data)
     0.00,   # bias
 ]
 
@@ -80,7 +80,7 @@ def default_state() -> BanditState:
     """Return a warm-started bandit state."""
     theta = np.array(_THETA_WARM, dtype=np.float64)
     A     = np.eye(FEATURE_DIM, dtype=np.float64) * LAMBDA
-    b     = A @ theta        # b = Aθ₀  →  A⁻¹b = θ₀  (warm start)
+    b     = A @ theta        # b = Aθ₀, so A⁻¹b = θ₀ (warm start)
     return BanditState(
         theta=theta.tolist(),
         A_flat=A.flatten().tolist(),
@@ -144,7 +144,7 @@ def update(state: BanditState, phi: list[float], reward: float) -> BanditState:
 # ── Reward helper ─────────────────────────────────────────────────────────────
 
 def scroll_reward(scroll_depth: int) -> float:
-    """Implicit reward from scroll depth — exponential decay toward 0.65.
+    """Implicit reward from scroll depth: exponential decay toward 0.65.
 
     The engagement signal is strongest at the 75% threshold (reward ≈ 0.90)
     and decays toward 0.65 as scroll_depth increases, reflecting diminishing

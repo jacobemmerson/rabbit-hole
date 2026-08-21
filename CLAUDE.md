@@ -26,7 +26,7 @@ See `.env.example` for all options (`DEBUG`, `REGION`).
 
 ## Architecture
 
-**Split state model.** User state is divided between a minimal signed `itsdangerous` cookie (server-trusted) and the client's IndexedDB (full state + caches). Wikipedia API calls happen from the user's browser, not the server — the server only runs embedding inference and scoring.
+**Split state model.** User state is divided between a minimal signed `itsdangerous` cookie (server-trusted) and the client's IndexedDB (full state + caches). Wikipedia API calls happen from the user's browser, not the server. The server only runs embedding inference and scoring.
 
 ### Signed cookie (server-trusted, 4 fields only)
 ```json
@@ -41,30 +41,30 @@ Read by the server for `/api/score` (embedding weights) and `/article/{title}` (
 | `candidates` | Wikipedia search results keyed by query string (24 h TTL) |
 | `summaries` | Article summaries including `wordCount` (6 h TTL) |
 | `bandit` | Linear bandit state: θ, A (9×9), b, n_updates |
-| `phi` | Feature vectors per article, keyed by title — populated by `/api/score`, consumed by `/api/bandit/update` |
+| `phi` | Feature vectors per article, keyed by title; populated by `/api/score`, consumed by `/api/bandit/update` |
 
 ### Module layout
 
 **Server (`app/`)**
-- `main.py` — FastAPI app factory + lifespan: loads embedding model, warms popularity/candidate caches, runs 12-hour background refresh
-- `config.py` — pydantic-settings config from `.env`
-- `models.py` — `UserProfile` (slim cookie model), `ReadingHistoryEntry`, `ArticleSummary`, `CandidateItem`, `ScoreRequest`, `BanditStateModel`
-- `routes/pages.py` — HTML routes: `/` (feed shell + `__RH_INIT__` injection), `/onboarding`, `/article/{title}`
-- `routes/api.py` — API routes (see below)
-- `services/cookie.py` — `load_profile` / `dump_profile` using `itsdangerous.URLSafeSerializer`
-- `services/wikipedia.py` — Wikipedia REST + Action API client; in-memory TTL caches; rate-limit semaphores (`_rest_sem=2`, `_action_sem=2`, both 0.15 s sleep); candidate cache persisted to `.cache/candidates.json`
-- `services/embeddings.py` — `all-MiniLM-L6-v2` wrapper; `compute_taste_vectors` (multi-vector k-means + recency decay + negative signal); `score_candidates_multi` (batch embed once, dot-product k times)
-- `services/recommendations.py` — `generate_cold_start`, `generate_warm_user`, `score_candidates_for_profile` (used by `/api/score`); `CATEGORY_SEED_POOL` + `get_daily_seeds`
-- `services/bandits.py` — Linear Thompson Sampling: `default_state`, `compute_phi`, `update`, `reward_from_feedback`, `scroll_reward`
+- `main.py`: FastAPI app factory + lifespan; loads embedding model, warms popularity/candidate caches, runs 12-hour background refresh
+- `config.py`: pydantic-settings config from `.env`
+- `models.py`: `UserProfile` (slim cookie model), `ReadingHistoryEntry`, `ArticleSummary`, `CandidateItem`, `ScoreRequest`, `BanditStateModel`
+- `routes/pages.py`: HTML routes: `/` (feed shell + `__RH_INIT__` injection), `/onboarding`, `/article/{title}`
+- `routes/api.py`: API routes (see below)
+- `services/cookie.py`: `load_profile` / `dump_profile` using `itsdangerous.URLSafeSerializer`
+- `services/wikipedia.py`: Wikipedia REST + Action API client; in-memory TTL caches; rate-limit semaphores (`_rest_sem=2`, `_action_sem=2`, both 0.15 s sleep); candidate cache persisted to `.cache/candidates.json`
+- `services/embeddings.py`: `all-MiniLM-L6-v2` wrapper; `compute_taste_vectors` (multi-vector k-means + recency decay + negative signal); `score_candidates_multi` (batch embed once, dot-product k times)
+- `services/recommendations.py`: `generate_cold_start`, `generate_warm_user`, `score_candidates_for_profile` (used by `/api/score`); `CATEGORY_SEED_POOL` + `get_daily_seeds`
+- `services/bandits.py`: Linear Thompson Sampling: `default_state`, `compute_phi`, `update`, `reward_from_feedback`, `scroll_reward`
 
 **Client (`app/static/`)**
-- `db.js` — IndexedDB wrapper: all store helpers, TTL constants
-- `wikipedia.js` — Client-side Wikipedia API calls with IDB caching; `search`, `bulkSummaries` (20-title batches, `exlimit=max`), `topDailySummaries`; includes `wordCount` from `page.length/6`
-- `feed.js` — Feed orchestration: `needsReset`, `generateFeed` (seed-queries → Wikipedia searches → score → render), `doRefresh`
-- `main.js` — ES module; seeds IDB from `__RH_INIT__`; drives feed page (tab switching, refresh, clear-data modal, bandit updates on feedback/scroll)
+- `db.js`: IndexedDB wrapper: all store helpers, TTL constants
+- `wikipedia.js`: Client-side Wikipedia API calls with IDB caching; `search`, `bulkSummaries` (20-title batches, `exlimit=max`), `topDailySummaries`; includes `wordCount` from `page.length/6`
+- `feed.js`: Feed orchestration: `needsReset`, `generateFeed` (seed-queries -> Wikipedia searches -> score -> render), `doRefresh`
+- `main.js`: ES module; seeds IDB from `__RH_INIT__`; drives feed page (tab switching, refresh, clear-data modal, bandit updates on feedback/scroll)
 
 **Media (`app/media/`)**
-- `idle.gif`, `hopping.gif` — Rabbit wordmark animation, served at `/media/`
+- `idle.gif`, `hopping.gif`: Rabbit wordmark animation, served at `/media/`
 
 ### Server API routes
 
@@ -80,11 +80,11 @@ Read by the server for `/api/score` (embedding weights) and `/article/{title}` (
 
 ### Feed generation flow (client-side)
 
-1. `needsReset(profile)` — compares `last_generated` to today in user's timezone (JS equivalent of the old `reset.py`)
-2. `GET /api/seed-queries` — server returns today's queries (no Wikipedia I/O)
-3. `wikipedia.js search()` × N queries — parallel, IDB-cached 24 h
-4. `wikipedia.js bulkSummaries()` — 20-title batches, IDB-cached 6 h
-5. `POST /api/score` — server embeds + ranks; reads cookie for trusted reading history weights
+1. `needsReset(profile)`: compares `last_generated` to today in user's timezone (JS equivalent of the old `reset.py`)
+2. `GET /api/seed-queries`: server returns today's queries (no Wikipedia I/O)
+3. `wikipedia.js search()` x N queries: parallel, IDB-cached 24 h
+4. `wikipedia.js bulkSummaries()`: 20-title batches, IDB-cached 6 h
+5. `POST /api/score`: server embeds + ranks; reads cookie for trusted reading history weights
 6. Result stored in IDB `profile.current_articles`; bandit phi_map stored in IDB `phi`
 
 ### Recommendation pipeline
@@ -101,13 +101,13 @@ Feature vector φ = `[sim₀…sim₄, pop_score, cat_score, from_history, 1.0]`
 
 **Reward signals**: 👍→1.0, 👎→0.0, scroll≥75%→`0.65 + 0.25·exp(−0.1·(depth−75))`, mid-scroll→no update.
 
-**Cold start** (< 3 history articles): `generate_cold_start` — daily-rotating seed queries, popularity-sorted, joint round-robin across categories + custom interests.
+**Cold start** (< 3 history articles): `generate_cold_start`, daily-rotating seed queries, popularity-sorted, joint round-robin across categories + custom interests.
 
 **Warm user**: `_gather_candidates` → `generate_warm_user` → multi-vector taste + bandit scoring + category/custom round-robin.
 
 ### Wikipedia API client
 
-`fetch_summaries_bulk` batches up to **20** titles per action API request (`exlimit=max`) — the `prop=extracts` hard limit. Two-pass extraction: `exintro=1` then `exsentences=3` fallback. Empty-extract articles excluded from results. Redirect aliases stored under input titles so Wikimedia pageviews titles match Wikipedia canonical titles.
+Server-side `fetch_summaries_bulk` (`services/wikipedia.py`) batches 50 titles per action API request, with two-pass extraction: `exintro=1` then `exsentences=3` fallback. Client-side `bulkSummaries` (`static/wikipedia.js`) batches 20 titles, the `prop=extracts` hard limit under `exlimit=max`, with the same sentence fallback plus redirect-alias handling so Wikimedia pageviews titles match Wikipedia canonical titles.
 
 ### `__RH_INIT__` handoff
 

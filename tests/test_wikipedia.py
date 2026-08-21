@@ -147,7 +147,7 @@ async def test_fetch_summary_exhausts_retries_on_429(mock_client, mocker):
 @pytest.mark.asyncio
 async def test_fetch_summaries_bulk_excludes_empty_extract(mock_client):
     # Both extract passes (exintro then exsentences fallback) return no text.
-    # The article must NOT appear in results — an empty card would be shown otherwise.
+    # The article must NOT appear in results, an empty card would be shown otherwise.
     empty_batch = {
         "query": {
             "pages": {

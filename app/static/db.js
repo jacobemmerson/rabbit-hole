@@ -33,7 +33,7 @@ function _get(db, store, key) {
       req.onsuccess = () => resolve(req.result ?? null);
       req.onerror  = ()  => reject(req.error);
     } catch (e) {
-      // Store doesn't exist yet (e.g. upgrade pending) — treat as a cache miss.
+      // Store doesn't exist yet (e.g. upgrade pending), treat as a cache miss.
       resolve(null);
     }
   });

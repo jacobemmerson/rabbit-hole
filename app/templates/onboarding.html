@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rabbit Hole — Pick your interests</title>
+  <title>Rabbit Hole · Pick your interests</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -63,7 +63,7 @@
       <button type="button" class="modal-close" id="close-modal-btn" aria-label="Close">✕</button>
     </div>
     <p class="modal-desc">
-      Describe something you're curious about in your own words — a topic, question, or idea.
+      Describe something you're curious about in your own words: a topic, question, or idea.
       We'll embed it directly into your taste profile.
     </p>
     <div class="modal-input-row">
@@ -94,7 +94,7 @@
         </li>
         <li>
           <span class="tos-icon">🤖</span>
-          <span><strong>Recommendation scoring.</strong> Your reading history is sent to a server to rank article suggestions. No data is collected or stored server-side — it is used only to compute your recommendations and immediately discarded.</span>
+          <span><strong>Recommendation scoring.</strong> Your reading history is sent to a server to rank article suggestions. No data is collected or stored server-side; it is used only to compute your recommendations and immediately discarded.</span>
         </li>
       </ul>
       <p class="tos-clear-note">You can delete all your data at any time using the "Clear data" button in the feed.</p>
@@ -131,7 +131,7 @@
     cb.addEventListener('change', update);
   });
 
-  // ToS gate — show the notice on first submit attempt, then let the form through.
+  // ToS gate: show the notice on first submit attempt, then let the form through.
   const tosModal = document.getElementById('tos-modal');
   let tosAccepted = false;
 

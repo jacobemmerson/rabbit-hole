@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Rabbit Hole — shared design system
+   Rabbit Hole: shared design system
    Single source of truth for tokens + components across feed, onboarding,
    and the injected article chrome (services/wikipedia.py inject_article_chrome).
    ========================================================================== */
@@ -298,7 +298,7 @@ a { color: var(--accent); }
   overflow: hidden;
 }
 
-/* Staggered entrance — up to 12 cards */
+/* Staggered entrance, up to 12 cards */
 .article-card:nth-child(1)  { animation-delay:   0ms; }
 .article-card:nth-child(2)  { animation-delay:  40ms; }
 .article-card:nth-child(3)  { animation-delay:  80ms; }

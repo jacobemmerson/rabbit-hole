@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Rabbit Hole — article chrome
+   Rabbit Hole: article chrome
    Scoped styles for the header, rating pill, and hint injected onto article
    pages. Deliberately contains NO reset and NO `body` rule: this sheet is
    linked into the proxied Wikipedia HTML, whose own layout must stay intact.

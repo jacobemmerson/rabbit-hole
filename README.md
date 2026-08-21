@@ -1,6 +1,6 @@
 # Rabbit Hole
 
-A self-hosted Wikipedia recommendation app. Each day it surfaces 8 articles tailored to your interests, inferred from reading history, scroll depth, and thumbs ratings. All user state lives in a signed cookie — no database required.
+A self-hosted Wikipedia recommendation app. Each day it surfaces 8 articles tailored to your interests, inferred from reading history, scroll depth, and thumbs ratings. All user state lives in a signed cookie, no database required.
 
 ---
 
@@ -29,7 +29,7 @@ uv sync
 
 # Configure environment
 cp .env.example .env
-# Edit .env — set SECRET_KEY to a long random string
+# Edit .env: set SECRET_KEY to a long random string
 ```
 
 Generate a secret key:
@@ -53,7 +53,7 @@ The embedding model loads on first startup (~10 seconds).
 
 | Variable | Default | Description |
 |---|---|---|
-| `SECRET_KEY` | *(required)* | Signs cookies — change before deploying |
+| `SECRET_KEY` | *(required)* | Signs cookies; change before deploying |
 | `DEBUG` | `false` | Enables FastAPI debug mode |
 | `REGION` | *(empty)* | ISO 3166-1 alpha-2 code (e.g. `US`) for regional Top Daily |
 

@@ -3,7 +3,7 @@ import pytest
 from app.models import ReadingHistoryEntry, UserProfile
 
 
-# POST /api/refresh has been removed — feed generation is now client-side via feed.js.
+# POST /api/refresh has been removed. Feed generation is now client-side via feed.js.
 # Article weight logic and score_candidates_for_profile are tested below.
 
 

@@ -5,7 +5,7 @@ const FEED_SIZE     = 12;
 const MAX_CANDIDATES = 36;
 const META_PREFIXES  = ['Outline of ', 'List of ', 'Index of ', 'Lists of ', 'Glossary of '];
 
-// ── Date helpers (replaces server-side reset.py) ──────────────────────────────
+// ── Date helpers (replaces server-side reset.py) ──────────────────────────
 
 export function getLocalDate(timezone) {
   try {
@@ -81,8 +81,8 @@ export async function generateFeed(db) {
   const learnedQueries = learnedData?.queries ?? [];
   const hasHistory     = (profile.reading_history ?? []).length > 0;
 
-  // Exit only when all three candidate sources are empty — seed groups can be
-  // empty once the taper kicks in (history_len ≥ 8) while learned queries and
+  // Exit only when all three candidate sources are empty. Seed groups can be
+  // empty once the taper kicks in (history_len >= 8) while learned queries and
   // history searches still provide candidates.
   if (!groups.length && !learnedQueries.length && !hasHistory) return;
 
@@ -104,7 +104,7 @@ export async function generateFeed(db) {
 
   // 3. Deduplicate into per-group buckets; track which learned query found each article.
   const groupBuckets = {};
-  const titleToQuery = {};  // article title → originating learned query (reward signal)
+  const titleToQuery = {};  // article title -> originating learned query (reward signal)
   const allocated = new Set(seen);
 
   for (const { group, titles, query } of searchResults) {

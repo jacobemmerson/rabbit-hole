@@ -191,7 +191,7 @@ def test_recency_decay_weights_recent_articles_more():
     assert vec_a is not None
     assert vec_b is not None
     assert not np.allclose(vec_a, vec_b), \
-        "Recency × rating interaction had no effect — different weight distributions should diverge"
+        "Recency x rating interaction had no effect: different weight distributions should diverge"
 
 
 def test_multi_vector_returned_with_sufficient_history():

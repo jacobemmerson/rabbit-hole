@@ -207,7 +207,7 @@ export async function renderDevPanel(db) {
     await Promise.all(currentArticles.map(async t => [t, await getPhi(db, t)]))
   );
 
-  // Seed queries from server — pass history_len so the dev panel reflects
+  // Seed queries from server. Pass history_len so the dev panel reflects
   // the actual tapered set being used, not the full cold-start set.
   const categories = profile?.selected_categories ?? [];
   const custom = (profile?.custom_interests ?? []).filter(i => i.trim() !== 'dev');
